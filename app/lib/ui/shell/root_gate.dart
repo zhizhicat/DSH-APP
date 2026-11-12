@@ -149,7 +149,7 @@ class _RootGateState extends ConsumerState<RootGate> {
   void _startUnpack() {
     // Time left is estimated from the first progress report on.
     ref.read(installEtaProvider);
-    unawaited(ref.read(runtimeInstallProvider.notifier).install());
+    ref.read(runtimeInstallProvider.notifier).installFromStatus();
     // Android 13 asks about notifications once the channels exist: now, as the
     // unpack (and its notification) starts, not over a later step.
     unawaited(ref.read(notifyChannelProvider).status().then<void>((_) {}, onError: (_) {}));

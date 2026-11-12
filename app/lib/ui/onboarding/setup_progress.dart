@@ -61,6 +61,37 @@ class RuntimeInstallController extends Notifier<bool> {
     });
   }
 
+  /// The one entry for a plain install request (engine page, drawer, onboarding,
+  /// root gate): a complete package unpacks, a noruntime build downloads the
+  /// default channel first. [dropKept] always takes the bundled path: a
+  /// kept-files failure means archives already sit on disk.
+  void installFromStatus({bool dropKept = false}) {
+    final status = ref.read(localRuntimeProvider).status;
+    if (dropKept || status.bundledVersion != null) {
+      unawaited(install(dropKept: dropKept));
+      return;
+    }
+    unawaited(_installFromChannel());
+  }
+
+  Future<void> _installFromChannel() async {
+    final runtime = ref.read(localRuntimeProvider.notifier);
+    try {
+      final channels = await runtime.channels();
+      final channel = channels.isEmpty
+          ? null
+          : channels.firstWhere((c) => c.isDefault, orElse: () => channels.first);
+      if (channel != null) {
+        await installChannel(channel);
+        return;
+      }
+    } catch (_) {
+      // No channel registry or no reachable list: fall through and let the
+      // bundled install surface its own error.
+    }
+    await install();
+  }
+
   Future<void> _run(Future<void> Function() start) async {
     state = false;
     // Installing means wanting it here: launches without it no longer skip setup.
