@@ -26,18 +26,26 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Install toolchain (JDK 17 / Flutter 3.47.7 / Android SDK+NDK)
+      - name: Install toolchain (JDK 17 / Android SDK+NDK; Flutter via flutter-action)
+        run: bash tooling/setup-toolchain.sh
+
+      - name: Set up Flutter (pinned, mirrors upstream CI)
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2 (pinned upstream)
+        with:
+          flutter-version: 3.47.7
+          channel: stable
+          cache: true
+
+      - name: Export toolchain env
         run: |
-          bash tooling/setup-toolchain.sh
-          source tooling/env.sh
-          echo "$PATH" >> "$GITHUB_PATH"
-          {
-            echo "JAVA_HOME=$JAVA_HOME"
-            echo "ANDROID_HOME=$ANDROID_HOME"
-            echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
-            echo "PUB_HOSTED_URL=$PUB_HOSTED_URL"
-            echo "FLUTTER_STORAGE_BASE_URL=$FLUTTER_STORAGE_BASE_URL"
-          } >> "$GITHUB_ENV"
+          bash tooling/setup-toolchain.sh >/dev/null 2>&1 || true
+          JAVA_HOME=$(grep -o 'JAVA_HOME="[^"]*"' tooling/env.sh | cut -d'"' -f2)
+          SDK=$(grep -o 'ANDROID_HOME="[^"]*"' tooling/env.sh | cut -d'"' -f2)
+          echo "JAVA_HOME=$JAVA_HOME" >> "$GITHUB_ENV"
+          echo "ANDROID_HOME=$SDK" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=$SDK" >> "$GITHUB_ENV"
+          # 注意：不导出 env.sh 里的 PUB_HOSTED_URL/FLUTTER_STORAGE_BASE_URL——
+          # 国内镜像与 pub.dev 不同步，--enforce-lockfile 会因版本差而失败（首次构建已踩坑）
 
       - name: Flutter plugins and local.properties
         working-directory: app
