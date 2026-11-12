@@ -35,6 +35,23 @@ def check_file(path, size, digest):
         raise ValueError(f"sha256 mismatch: {path}")
 
 
+def check_bundle_noruntime(flavor):
+    """noruntime builds ship no bundled runtime assets; container libs must stay."""
+    abi = ABIS[flavor]
+    bundle = ROOT / "runtime" / "out" / abi
+    assets = bundle / "assets" / "runtime"
+    if assets.is_dir():
+        leftovers = sorted(p.name for p in assets.iterdir())
+        if leftovers:
+            raise ValueError(f"noruntime build but bundled runtime assets present: {leftovers}")
+    jni = bundle / "jniLibs" / abi
+    for name in REQUIRED_JNI:
+        path = jni / name
+        if not path.is_file() or path.stat().st_size <= 0:
+            raise ValueError(f"missing container lib: {path}")
+    print(f"runtime verified: {flavor} ({abi}), noruntime, container libs ok")
+
+
 def check_bundle(flavor):
     abi = ABIS[flavor]
     bundle = ROOT / "runtime" / "out" / abi
@@ -85,11 +102,14 @@ def check_bundle(flavor):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("flavors", nargs="+", choices=ABIS)
+    parser.add_argument("--noruntime", action="store_true",
+                        help="verify that no runtime assets are bundled and container libs exist")
     args = parser.parse_args()
+    check = check_bundle_noruntime if args.noruntime else check_bundle
     failed = False
     for flavor in args.flavors:
         try:
-            check_bundle(flavor)
+            check(flavor)
         except (OSError, ValueError, KeyError, TypeError) as error:
             failed = True
             print(f"build-apk: {flavor}: {error}", file=sys.stderr)
