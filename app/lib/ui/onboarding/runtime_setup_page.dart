@@ -319,7 +319,7 @@ class _RuntimeSetupPageState extends ConsumerState<RuntimeSetupPage> {
           // The way out when kept files cannot go back: quiet, in the log link's place.
           Center(
             child: TextButton(
-              onPressed: () => unawaited(_install(dropKept: true)),
+              onPressed: () => _install(dropKept: true),
               style: TextButton.styleFrom(foregroundColor: scheme.onSurfaceVariant),
               child: Text(l10n.shellRuntimeContinueWithoutKept),
             ),
