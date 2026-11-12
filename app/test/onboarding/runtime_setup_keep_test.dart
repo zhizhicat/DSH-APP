@@ -26,7 +26,9 @@ void main() {
     final runtime = _Runtime(
       LocalRuntimeState(
         loaded: true,
-        status: RuntimeStatus(phase: RuntimePhase.error, error: error),
+        // A kept-files failure happens mid-unpack of a bundled runtime, so this
+        // page retries the bundled install (a noruntime build would channel-install).
+        status: RuntimeStatus(phase: RuntimePhase.error, error: error, bundledVersion: 'bundled'),
       ),
     );
     usePhoneSurface(tester);

@@ -17479,10 +17479,7 @@ class L10nEn extends L10n {
   @override
   String get shellRuntimeFirstSetup => 'First setup takes a minute or two';
 
-  /// No description provided for @shellRuntimeDownloading.
-  ///
-  /// In en, this message translates to:
-  /// **'Downloading the runtime (about 150 MB, one time)'**
+  @override
   String get shellRuntimeDownloading => 'Downloading the runtime (about 150 MB, one time)';
 
   @override

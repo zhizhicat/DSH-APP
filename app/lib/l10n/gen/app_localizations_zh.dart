@@ -16596,10 +16596,7 @@ class L10nZh extends L10n {
   @override
   String get shellRuntimeFirstSetup => '首次准备约需一两分钟';
 
-  /// No description provided for @shellRuntimeDownloading.
-  ///
-  /// In zh, this message translates to:
-  /// **'正在下载运行环境（约 150 MB，仅此一次）'**
+  @override
   String get shellRuntimeDownloading => '正在下载运行环境（约 150 MB，仅此一次）';
 
   @override
