@@ -53,6 +53,9 @@ jobs:
           flutter pub get --enforce-lockfile
           printf 'sdk.dir=%s\nflutter.sdk=%s\n' "$ANDROID_HOME" "$FLUTTER_ROOT" > android/local.properties
 
+      - name: Build bundled runtime (rootfs + Node, per build-apk.sh preflight)
+        run: bash runtime/build-runtime.sh arm64-v8a
+
       - name: Build arm64 release APK
         run: bash tooling/build-apk.sh
 
