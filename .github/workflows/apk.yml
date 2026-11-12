@@ -56,10 +56,10 @@ jobs:
       # build-runtime.sh 依赖的 termux 官方池已轮换掉 pin 的 proot deb（全镜像 404，
       # 上游 CI 不构建运行时所以未暴露）。改用官方 release APK 里的运行时资产：
       # 它本就由同一套 build-runtime.sh 产出、带 manifest+sha256，check_runtime_bundle 会全量校验。
-      # tawcroot/build.py 强制要求 NDK 28.2.13676358（tawc source.json pin），
-      # setup-toolchain 只装 Flutter 默认 NDK，这里补装
-      - name: Install NDK pinned by tawcroot
-        run: yes | sdkmanager --sdk_root="$ANDROID_HOME" "ndk;28.2.13676358" >/dev/null || sdkmanager --sdk_root="$ANDROID_HOME" "ndk;28.2.13676358"
+      # tawcroot/build.py 精确找 <SDK>/ndk/28.2.13676358；setup-toolchain 通常已装 r28c，
+      # 此步幂等兜底（用完整路径，不依赖 env.sh 的 PATH）
+      - name: Ensure NDK 28.2.13676358 present
+        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --sdk_root="$ANDROID_HOME" "ndk;28.2.13676358" >/dev/null || true
 
       - name: Restore bundled runtime from upstream release (pinned)
         run: |
