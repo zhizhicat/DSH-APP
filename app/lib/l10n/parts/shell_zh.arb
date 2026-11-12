@@ -37,6 +37,7 @@
   "shellRuntimeIncomplete": "安装未完成",
   "shellRuntimeFilesKept": "对话和文件都会保留",
   "shellRuntimeFirstSetup": "首次准备约需一两分钟",
+  "shellRuntimeDownloading": "正在下载运行环境（约 150 MB，仅此一次）",
   "shellRuntimeContinuing": "即将继续",
   "shellRuntimeRestoreFailed": "没能放回保留的内容",
   "shellRuntimeExtractFailed": "解压时出错",

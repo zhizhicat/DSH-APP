@@ -27,6 +27,7 @@
   "shellRuntimeIncomplete": "Installation incomplete",
   "shellRuntimeFilesKept": "Your chats and files stay",
   "shellRuntimeFirstSetup": "First setup takes a minute or two",
+  "shellRuntimeDownloading": "Downloading the runtime (about 150 MB, one time)",
   "shellRuntimeContinuing": "Continuing shortly",
   "shellRuntimeRestoreFailed": "Couldn’t restore saved content",
   "shellRuntimeExtractFailed": "Couldn’t extract files",

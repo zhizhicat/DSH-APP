@@ -30386,6 +30386,12 @@ abstract class L10n {
   /// **'首次准备约需一两分钟'**
   String get shellRuntimeFirstSetup;
 
+  /// No description provided for @shellRuntimeDownloading.
+  ///
+  /// In zh, this message translates to:
+  /// **'正在下载运行环境（约 150 MB，仅此一次）'**
+  String get shellRuntimeDownloading;
+
   /// No description provided for @shellRuntimeContinuing.
   ///
   /// In zh, this message translates to:

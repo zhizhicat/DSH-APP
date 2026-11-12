@@ -41,19 +41,32 @@ class RuntimeInstallController extends Notifier<bool> {
   Future<void> install({bool dropKept = false}) {
     if (_pending case final pending?) return pending;
     if (ref.read(localRuntimeProvider).status.phase == RuntimePhase.installing) return Future.value();
-    final run = _pending = _run(dropKept);
+    final runtime = ref.read(localRuntimeProvider.notifier);
+    final run = _pending = _run(
+      () => dropKept ? runtime.installDroppingKept() : runtime.install(),
+    );
     return run.whenComplete(() {
       if (identical(_pending, run)) _pending = null;
     });
   }
 
-  Future<void> _run(bool dropKept) async {
+  /// noruntime first install: download the runtime channel, then unpack.
+  Future<void> installChannel(RuntimeChannelInfo channel) {
+    if (_pending case final pending?) return pending;
+    if (ref.read(localRuntimeProvider).status.phase == RuntimePhase.installing) return Future.value();
+    final runtime = ref.read(localRuntimeProvider.notifier);
+    final run = _pending = _run(() => runtime.installChannel(channel));
+    return run.whenComplete(() {
+      if (identical(_pending, run)) _pending = null;
+    });
+  }
+
+  Future<void> _run(Future<void> Function() start) async {
     state = false;
     // Installing means wanting it here: launches without it no longer skip setup.
     unawaited(ref.read(onboardingPrefsProvider.notifier).setLocalDeclined(false));
     try {
-      final runtime = ref.read(localRuntimeProvider.notifier);
-      await (dropKept ? runtime.installDroppingKept() : runtime.install());
+      await start();
     } catch (_) {
       if (ref.mounted && ref.read(localRuntimeProvider).status.phase == RuntimePhase.notInstalled) state = true;
     }

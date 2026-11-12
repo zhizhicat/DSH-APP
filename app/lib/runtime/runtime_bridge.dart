@@ -139,6 +139,21 @@ class RuntimeFailure {
   List<String> get culprits => {...suspects, ...recent}.toList();
 }
 
+/// One entry of assets/channels.json, as the Kotlin side reports it.
+class RuntimeChannelInfo {
+  const RuntimeChannelInfo({required this.id, required this.name, required this.isDefault});
+
+  factory RuntimeChannelInfo.fromMap(Map<Object?, Object?> map) => RuntimeChannelInfo(
+    id: map['id'] as String,
+    name: map['name'] as String? ?? map['id'] as String,
+    isDefault: map['isDefault'] as bool? ?? false,
+  );
+
+  final String id;
+  final String name;
+  final bool isDefault;
+}
+
 /// Snapshot of the native runtime (see docs/architecture.md, "RuntimeStatus").
 class RuntimeStatus {
   const RuntimeStatus({
@@ -575,6 +590,23 @@ class RuntimeBridge {
   /// [dropKept]: give up what a reset kept but cannot be put back.
   Future<void> install({bool dropKept = false}) =>
       _methods.invokeMethod<void>('install', dropKept ? const {'dropKept': true} : null);
+
+  /// Download channels for noruntime builds (download-on-first-run). A complete
+  /// package still gets the list (channels.json ships in both), but its UI
+  /// never needs it: the bundled install goes first there.
+  Future<List<RuntimeChannelInfo>> channels() async {
+    final raw = await _methods.invokeListMethod<Object?>('channels');
+    return [
+      for (final e in raw ?? const <Object?>[])
+        RuntimeChannelInfo.fromMap((e! as Map).cast<Object?, Object?>()),
+    ];
+  }
+
+  /// noruntime first install: fetch the channel manifest, download its
+  /// archives into the cache, verify, unpack. Progress arrives with
+  /// step: 'download' first, then the usual 'extract'.
+  Future<void> installChannel(String id) =>
+      _methods.invokeMethod<void>('installChannel', {'id': id});
 
   /// [phoneStorage] mounts the phone's shared storage at /sdcard (needs [requestStorage] first).
   /// [mode] null keeps the current mode; [EngineMode.normal] while in safe mode starts the

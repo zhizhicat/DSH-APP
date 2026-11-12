@@ -92,17 +92,36 @@ class _RuntimeSetupPageState extends ConsumerState<RuntimeSetupPage> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       final phase = ref.read(localRuntimeProvider).status.phase;
-      if (phase == RuntimePhase.notInstalled && !_asks) _install();
+      if (phase == RuntimePhase.notInstalled && !_asks) unawaited(_install());
     });
   }
 
   /// Through the one entry ([runtimeInstallProvider]): a request while an
   /// unpack is on its way is that same unpack.
-  void _install({bool dropKept = false}) {
+  ///
+  /// A noruntime build (no bundled runtime) downloads the runtime channel
+  /// instead: pick the default channel, fetch its archives, then unpack.
+  Future<void> _install({bool dropKept = false}) async {
     setState(() => _installRequested = true);
     // Sample the time left from the start.
     ref.read(installEtaProvider);
-    unawaited(ref.read(runtimeInstallProvider.notifier).install(dropKept: dropKept));
+    final notifier = ref.read(runtimeInstallProvider.notifier);
+    final runtime = ref.read(localRuntimeProvider.notifier);
+    if (!dropKept && ref.read(localRuntimeProvider).status.bundledVersion == null) {
+      try {
+        final channels = await runtime.channels();
+        final channel = channels.isEmpty
+            ? null
+            : channels.firstWhere((c) => c.isDefault, orElse: () => channels.first);
+        if (channel != null) {
+          unawaited(notifier.installChannel(channel));
+          return;
+        }
+      } catch (_) {
+        // Fall through to the bundled install; its error surfaces as usual.
+      }
+    }
+    unawaited(notifier.install(dropKept: dropKept));
   }
 
   _SetupView _viewFor(LocalRuntimeState state, {required bool launchFailed}) {
@@ -162,7 +181,7 @@ class _RuntimeSetupPageState extends ConsumerState<RuntimeSetupPage> {
           ? RuntimeChoiceView(
               key: const ValueKey('choose'),
               leading: widget.leading,
-              onLocal: widget.onLocal ?? () => _install(),
+              onLocal: widget.onLocal ?? () => unawaited(_install()),
               onRemote: widget.onRemote!,
             )
           : KeyedSubtree(key: const ValueKey('progress'), child: _progress(context, state, view)),
@@ -190,6 +209,7 @@ class _RuntimeSetupPageState extends ConsumerState<RuntimeSetupPage> {
       _SetupView.failed => l10n.shellRuntimeIncomplete,
     };
     final body = switch (view) {
+      _SetupView.installing when state.progress?.step == 'download' => l10n.shellRuntimeDownloading,
       _SetupView.waiting || _SetupView.installing || _SetupView.choose when widget.waiting => l10n.setupWaitingBody,
       _SetupView.waiting ||
       _SetupView.installing ||
@@ -275,7 +295,7 @@ class _RuntimeSetupPageState extends ConsumerState<RuntimeSetupPage> {
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: FilledButton(onPressed: () => _install(), child: Text(l10n.commonRetry)),
+                child: FilledButton(onPressed: () => unawaited(_install()), child: Text(l10n.commonRetry)),
               ),
             ],
           ),
@@ -317,7 +337,7 @@ class _RuntimeSetupPageState extends ConsumerState<RuntimeSetupPage> {
           // The way out when kept files cannot go back: quiet, in the log link's place.
           Center(
             child: TextButton(
-              onPressed: () => _install(dropKept: true),
+              onPressed: () => unawaited(_install(dropKept: true)),
               style: TextButton.styleFrom(foregroundColor: scheme.onSurfaceVariant),
               child: Text(l10n.shellRuntimeContinueWithoutKept),
             ),

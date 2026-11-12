@@ -105,6 +105,15 @@ class LocalRuntimeController extends Notifier<LocalRuntimeState> {
     return _bridge.install(dropKept: true);
   }
 
+  /// Download channels for noruntime builds.
+  Future<List<RuntimeChannelInfo>> channels() => _bridge.channels();
+
+  /// noruntime first install: download the channel, then unpack.
+  Future<void> installChannel(RuntimeChannelInfo channel) {
+    ref.read(readListCredentialEpochProvider.notifier).advance();
+    return _bridge.installChannel(channel.id);
+  }
+
   /// The API key is not passed here: it is written to DSH's own credential store
   /// after connecting (see connection_state.dart), so it can change without a restart.
   /// Keeps the current mode: in safe mode this starts safe mode again.
