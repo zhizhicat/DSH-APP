@@ -6,10 +6,10 @@
       "id": "dsh-go-r15",
       "name": "官方运行时 r15 · Ubuntu 24.04.5 · Node 24.22.1 · DSH 0.2.2-rc.1",
       "manifest": {
-        "url": "http://47.106.208.163/dsh-runtime/runtime-r15/manifest.json",
+        "url": "https://ghfast.top/https://github.com/zhizhicat/DSH-APP/releases/download/runtime-r15/manifest.json",
         "sha256": "89c496c02f1e26ac84dc540e9b083b4aa54d09dd1a7e07f01ebd4be055b9feb1"
       },
-      "filesBaseUrl": "http://47.106.208.163/dsh-runtime/runtime-r15/"
+      "filesBaseUrl": "https://ghfast.top/https://github.com/zhizhicat/DSH-APP/releases/download/runtime-r15/"
     }
   ]
 }
