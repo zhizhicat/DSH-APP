@@ -89,6 +89,25 @@ class RuntimePlugin :
                 }
                 result.success(null)
             }
+            "channels" -> {
+                val registry = runCatching {
+                    ChannelRegistry.load(appContext).map { c ->
+                        mapOf("id" to c.id, "name" to c.name, "isDefault" to (c.id == ChannelRegistry.defaultId(appContext)))
+                    }
+                }.getOrElse { emptyList() }
+                result.success(registry)
+            }
+            "installChannel" -> {
+                val id = call.argument<String>("id")
+                if (id.isNullOrEmpty()) return result.error("bad_args", "channel id required", null)
+                if (controller.phase == RuntimeController.Phase.INSTALLING) return result.error("install_busy", null, null)
+                val intent = Intent(appContext, DshService::class.java).setAction(DshService.ACTION_INSTALL)
+                appContext.startForegroundService(intent)
+                controller.installChannel(id) { error ->
+                    appContext.startService(Intent(appContext, DshService::class.java).setAction(DshService.ACTION_INSTALL_DONE))
+                    if (error == null) result.success(null) else result.error("install_failed", error.message, null)
+                }
+            }
             "install" -> {
                 // A second call must not end the running unpack's foreground service.
                 if (controller.phase == RuntimeController.Phase.INSTALLING) return result.error("install_busy", null, null)

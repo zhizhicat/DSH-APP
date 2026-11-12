@@ -33,6 +33,7 @@ class RuntimeInstaller(
     private val manifest: RuntimeManifest,
     private val onLog: (String) -> Unit,
     private val sync: () -> Unit = ::syncFilesystems,
+    private val source: ArchiveSource = AssetArchiveSource(context),
 ) {
     val baseDir = File(context.filesDir, "runtime")
     val rootfs = File(baseDir, "rootfs")
@@ -65,7 +66,7 @@ class RuntimeInstaller(
         checkFreeSpace(archives)
         staging.mkdirs()
 
-        val assetLengths = archives.map { assetLength("${RuntimeManifest.ASSET_DIR}/${it.asset}") }
+        val assetLengths = archives.map { source.length("${RuntimeManifest.ASSET_DIR}/${it.asset}") }
         val totals = archives.mapIndexed { i, archive -> assetLengths[i].takeIf { it > 0 } ?: archive.bytes }
         val total = totals.sum()
         onLog("[dsh-app] install assets: ${archives.joinToString { it.asset }} ($total compressed bytes)")
@@ -83,7 +84,7 @@ class RuntimeInstaller(
             timed("verify") {
                 // Parallel readers revisit compressed bytes; hash each selected asset once, in order.
                 val digest = MessageDigest.getInstance("SHA-256")
-                DigestInputStream(context.assets.open(assetPath, AssetManager.ACCESS_STREAMING), digest).use { input ->
+                DigestInputStream(source.open(assetPath), digest).use { input ->
                     val buffer = ByteArray(1 shl 16)
                     while (input.read(buffer) >= 0) {}
                 }
@@ -98,11 +99,11 @@ class RuntimeInstaller(
                 val extractor = TarExtractor(staging, progress)
                 if (archive.asset.endsWith(".xz") && assetLengths[index] > 0) {
                     val decoded = ParallelXZInputStream.open(
-                        { AssetSeekableInputStream(context.assets.openFd(assetPath)) }, progress,
+                        { source.openSeekable(assetPath) }, progress,
                     )
                     extractor.extractDecoded(decoded)
                 } else {
-                    context.assets.open(assetPath, AssetManager.ACCESS_STREAMING).use { raw ->
+                    source.open(assetPath).use { raw ->
                         extractor.extract(raw, archive.asset)
                     }
                 }
@@ -154,11 +155,6 @@ class RuntimeInstaller(
         retireRuntime(baseDir, retiredDir, keepDir, keep)
     }
 
-    private fun assetLength(path: String): Long = try {
-        context.assets.openFd(path).use { it.length }
-    } catch (_: Exception) {
-        -1L // compressed asset; fall back to the manifest
-    }
 }
 
 internal fun requiredRuntimeInstallSpace(archives: List<RuntimeArchive>): Long {

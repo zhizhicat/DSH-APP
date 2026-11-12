@@ -15,6 +15,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import io.github.ccch1mneyyy.dsh_app.phone.skills.PhoneSkillRoute
 import java.io.File
+import java.io.IOException
 import java.util.concurrent.Executors
 
 /**
@@ -51,8 +52,27 @@ class RuntimeController private constructor(private val app: Context) : DshProce
     private val prefs = app.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
     private val workspaceRecovery = WorkspaceRecoveryMode(prefs.getBoolean(K_WORKSPACE_RECOVERY, false))
 
-    val manifest: RuntimeManifest by lazy { RuntimeManifest.load(app) }
-    private val installer by lazy { RuntimeInstaller(app, manifest, ::note) }
+    /** Bundle manifest, or null on noruntime builds (download-on-first-run). */
+    private val bundledManifest: RuntimeManifest? by lazy {
+        runCatching { RuntimeManifest.load(app) }.getOrNull()
+    }
+
+    /** Set once a channel's manifest has been fetched; takes precedence over the bundle. */
+    @Volatile private var channelManifest: RuntimeManifest? = null
+
+    val manifest: RuntimeManifest
+        get() = channelManifest ?: bundledManifest
+        ?: throw IOException("no runtime manifest: bundle absent, download a runtime channel first")
+
+    private val bundledInstaller: RuntimeInstaller? by lazy {
+        bundledManifest?.let { RuntimeInstaller(app, it, ::note) }
+    }
+
+    @Volatile private var channelInstaller: RuntimeInstaller? = null
+
+    private val installer: RuntimeInstaller
+        get() = channelInstaller ?: bundledInstaller
+        ?: throw IOException("runtime unavailable: bundle absent, download a runtime channel first")
     @Volatile private var process: DshProcess? = null
     @Volatile private var lastLaunch: LaunchDiagnostics? = null
     /** The start in progress is turning PRoot's fake hard links into real files (see [L2sMigration]). */
@@ -116,7 +136,9 @@ class RuntimeController private constructor(private val app: Context) : DshProce
             if (installer.isCurrent()) Phase.INSTALLED else Phase.NOT_INSTALLED
         } catch (e: Exception) {
             error = "manifest: ${e.message}"
-            Phase.ERROR
+            // A noruntime bundle without an installed runtime is a normal first
+            // run: onboarding picks a download channel instead of surfacing an error.
+            if (bundledManifest == null) Phase.NOT_INSTALLED else Phase.ERROR
         }
     }
 
@@ -272,6 +294,72 @@ class RuntimeController private constructor(private val app: Context) : DshProce
             }
         }
     }
+
+    /**
+     * noruntime path: fetch the channel manifest, download its archives into the
+     * cache, then unpack from there. Progress is split into a "download" and an
+     * "extract" step; both reuse the install service notification.
+     */
+    @Synchronized fun installChannel(channelId: String, onDone: (Throwable?) -> Unit) {
+        if (phase == Phase.INSTALLING) return onDone(null)
+        if (process != null || resetting || phase in setOf(Phase.STARTING, Phase.RUNNING, Phase.STOPPING)) {
+            return onDone(RuntimeUpgradeBlocked("running"))
+        }
+        setPhase(Phase.INSTALLING)
+        worker.execute {
+            try {
+                val channel = ChannelRegistry.load(app).firstOrNull { it.id == channelId }
+                    ?: throw IOException("unknown runtime channel: $channelId")
+                val downloads = File(app.cacheDir, "runtime-downloads")
+                downloads.mkdirs()
+                val downloader = RuntimeDownloader(::note) { isCancelledDownloads() }
+                log("[dsh-app] channel ${channel.id}: fetching manifest", "system")
+                val manifestFile = downloader.download(
+                    channel.manifestUrl, File(downloads, "manifest.json"), channel.manifestSha256,
+                ).file
+                val m = RuntimeManifest.fromJson(JSONObject(manifestFile.readText()))
+                synchronized(this) { channelManifest = m }
+                val inst = RuntimeInstaller(app, m, ::note, source = FileArchiveSource(downloads))
+                    .also { channelInstaller = it }
+                log("[dsh-app] channel ${channel.id}: downloading ${m.archives.size} archive(s) " +
+                    "(${m.archives.sumOf { it.bytes }.let { b -> if (b > 0) b / (1024 * 1024) else -1 }}MB)", "system")
+                for (archive in m.archivesForInstall(false)) {
+                    downloader.download(
+                        channel.filesBaseUrl + archive.asset,
+                        File(downloads, archive.asset),
+                        archive.sha256,
+                        archive.bytes.takeIf { it > 0 } ?: -1L,
+                    ) { done, total ->
+                        emit(mapOf("type" to "progress", "step" to "download", "done" to done, "total" to total))
+                    }
+                }
+                log("[dsh-app] unpacking runtime ${m.runtimeVersion} (${m.abi})", "system")
+                val started = System.currentTimeMillis()
+                if (inst.rootfs.exists() && !DshProcess(app, m, inst.rootfs, this).killStrays()) {
+                    throw RuntimeUpgradeBlocked("running")
+                }
+                inst.install(dropKept = false) { done, total ->
+                    emit(mapOf("type" to "progress", "step" to "extract", "done" to done, "total" to total))
+                }
+                log("[dsh-app] runtime ready in ${(System.currentTimeMillis() - started) / 1000}s", "system")
+                error = null
+                strikes = 0
+                failure = null
+                prefs.edit().putInt(K_STRIKES, 0).remove(K_FAILURE).apply()
+                setPhase(Phase.INSTALLED)
+                // The unpacked rootfs no longer needs the downloaded archives.
+                downloads.deleteRecursively()
+                main.post { onDone(null) }
+            } catch (e: Throwable) {
+                error = "install failed: ${e.message}"
+                log("[dsh-app] ${error}", "system")
+                setPhase(Phase.ERROR)
+                main.post { onDone(e) }
+            }
+        }
+    }
+
+    private fun isCancelledDownloads(): Boolean = false // v1: no UI cancel; future: DshService action
 
     /**
      * Starts the foreground service, which calls [startProcess]. [mode] is "safe", "normal"
