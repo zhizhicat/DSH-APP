@@ -66,15 +66,15 @@ jobs:
           set -euo pipefail
           mkdir -p runtime/.cache/release
           cd runtime/.cache/release
-          curl -sL -o dsh-go.apk "https://github.com/ccch1mneyyy/dsh-Go/releases/download/v1.0.15/dsh-go-1.0.15-arm64.apk"
+          curl -sL -o dsh-go-1.0.15-arm64.apk "https://github.com/ccch1mneyyy/dsh-Go/releases/download/v1.0.15/dsh-go-1.0.15-arm64.apk"
           curl -fSL --retry 3 -o SHA256SUMS "https://github.com/ccch1mneyyy/dsh-Go/releases/download/v1.0.15/SHA256SUMS"
           sha256sum -c SHA256SUMS
-          unzip -o -q dsh-go.apk 'assets/runtime/*' -d extracted
+          unzip -o -q dsh-go-1.0.15-arm64.apk 'assets/runtime/*' -d extracted
           mkdir -p ../../out/arm64-v8a/assets
           rm -rf ../../out/arm64-v8a/assets/runtime
           mv extracted/assets/runtime ../../out/arm64-v8a/assets/
           for so in libproot.so libproot-loader.so libtalloc.so libandroid-shmem.so; do
-            unzip -o -q -j dsh-go.apk "lib/arm64-v8a/$so" -d ../../out/arm64-v8a/jniLibs/arm64-v8a/
+            unzip -o -q -j dsh-go-1.0.15-arm64.apk "lib/arm64-v8a/$so" -d ../../out/arm64-v8a/jniLibs/arm64-v8a/
           done
           ls -lh ../../out/arm64-v8a/assets/runtime/ ../../out/arm64-v8a/jniLibs/arm64-v8a/
 
