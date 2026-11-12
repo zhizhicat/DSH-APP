@@ -56,20 +56,25 @@ jobs:
       # build-runtime.sh 依赖的 termux 官方池已轮换掉 pin 的 proot deb（全镜像 404，
       # 上游 CI 不构建运行时所以未暴露）。改用官方 release APK 里的运行时资产：
       # 它本就由同一套 build-runtime.sh 产出、带 manifest+sha256，check_runtime_bundle 会全量校验。
+      # tawcroot/build.py 强制要求 NDK 28.2.13676358（tawc source.json pin），
+      # setup-toolchain 只装 Flutter 默认 NDK，这里补装
+      - name: Install NDK pinned by tawcroot
+        run: yes | sdkmanager --sdk_root="$ANDROID_HOME" "ndk;28.2.13676358" >/dev/null || sdkmanager --sdk_root="$ANDROID_HOME" "ndk;28.2.13676358"
+
       - name: Restore bundled runtime from upstream release (pinned)
         run: |
           set -euo pipefail
           mkdir -p runtime/.cache/release
           cd runtime/.cache/release
-          curl -sL -o dsh-go-1.0.15-arm64.apk "https://github.com/ccch1mneyyy/dsh-Go/releases/download/v1.0.15/dsh-go-1.0.15-arm64.apk"
+          curl -sL -o dsh-go.apk "https://github.com/ccch1mneyyy/dsh-Go/releases/download/v1.0.15/dsh-go-1.0.15-arm64.apk"
           curl -sL -o SHA256SUMS "https://github.com/ccch1mneyyy/dsh-Go/releases/download/v1.0.15/SHA256SUMS"
           sha256sum -c SHA256SUMS
-          unzip -o -q dsh-go-1.0.15-arm64.apk 'assets/runtime/*' -d extracted
-          mkdir -p ../../out/arm64-v8a/assets ../../out/arm64-v8a/jniLibs/arm64-v8a
+          unzip -o -q dsh-go.apk 'assets/runtime/*' -d extracted
+          mkdir -p ../../out/arm64-v8a/assets
           rm -rf ../../out/arm64-v8a/assets/runtime
           mv extracted/assets/runtime ../../out/arm64-v8a/assets/
           for so in libproot.so libproot-loader.so libtalloc.so libandroid-shmem.so; do
-            unzip -o -q -j dsh-go-1.0.15-arm64.apk "lib/arm64-v8a/$so" -d ../../out/arm64-v8a/jniLibs/arm64-v8a/
+            unzip -o -q -j dsh-go.apk "lib/arm64-v8a/$so" -d ../../out/arm64-v8a/jniLibs/arm64-v8a/
           done
           ls -lh ../../out/arm64-v8a/assets/runtime/ ../../out/arm64-v8a/jniLibs/arm64-v8a/
 
