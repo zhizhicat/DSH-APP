@@ -44,6 +44,9 @@ jobs:
           echo "JAVA_HOME=$JAVA_HOME" >> "$GITHUB_ENV"
           echo "ANDROID_HOME=$SDK" >> "$GITHUB_ENV"
           echo "ANDROID_SDK_ROOT=$SDK" >> "$GITHUB_ENV"
+          # runner 镜像预置 ANDROID_NDK_HOME 指向旧版 NDK，会盖过 setup-toolchain 装的
+          # r28c；tawcroot/build.py 优先读它，这里显式钉到 pinned 版本
+          echo "ANDROID_NDK_HOME=$SDK/ndk/28.2.13676358" >> "$GITHUB_ENV"
           # 注意：不导出 env.sh 里的 PUB_HOSTED_URL/FLUTTER_STORAGE_BASE_URL——
           # 国内镜像与 pub.dev 不同步，--enforce-lockfile 会因版本差而失败（首次构建已踩坑）
 
