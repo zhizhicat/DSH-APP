@@ -44,6 +44,8 @@ jobs:
 
       - name: Install toolchain (JDK 17 / Android SDK+NDK; Flutter via flutter-action)
         run: bash tooling/setup-toolchain.sh
+        env:
+          TOOLCHAIN_MINIMAL: "1"
 
       - name: Set up Flutter (pinned, mirrors upstream CI)
         uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2 (pinned upstream)

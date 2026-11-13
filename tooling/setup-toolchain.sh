@@ -10,6 +10,8 @@ FLUTTER_VERSION="${FLUTTER_VERSION:-3.47.7}"
 FLUTTER_SHA256="${FLUTTER_SHA256:-af7455f540df951184c7953fbe3cf884766e7541dacf8571f9f582db03dd6230}"
 CMDLINE_TOOLS_BUILD="${CMDLINE_TOOLS_BUILD:-13114758}"
 SYSTEM_IMAGE="${SYSTEM_IMAGE:-system-images;android-35;google_apis;x86_64}"
+# APK builds need no emulator or system image; set to skip (~1.5GB less download).
+TOOLCHAIN_MINIMAL="${TOOLCHAIN_MINIMAL:-0}"
 
 JDK_DIR="$DEV_ROOT/jdk-17"
 FLUTTER_DIR="$DEV_ROOT/flutter"
@@ -62,7 +64,9 @@ install_cmdline_tools() {
   if [ -x "$SDK_DIR/cmdline-tools/latest/bin/sdkmanager" ]; then log "cmdline-tools present"; return; fi
   local name="commandlinetools-linux-${CMDLINE_TOOLS_BUILD}_latest.zip"
   log "cmdline-tools: $name"
-  download_cached "$DL/$name" "https://dl.google.com/android/repository/$name"
+  # dl.google.com 对 runner 时慢时快；腾讯 AndroidSDK 镜像同文件优先，失败回落官方。
+  download_cached "$DL/$name" "https://mirrors.cloud.tencent.com/AndroidSDK/$name" ||
+    rm -f "$DL/$name" && download_cached "$DL/$name" "https://dl.google.com/android/repository/$name"
   rm -rf "$DL/cmdline-tools" && mkdir -p "$SDK_DIR/cmdline-tools"
   (cd "$DL" && unzip -q -o "$name")
   rm -rf "$SDK_DIR/cmdline-tools/latest"
@@ -91,9 +95,15 @@ log "Flutter defaults: compileSdk=$COMPILE_SDK ndk=$NDK_VERSION"
 
 # Building the app requires accepting the Android SDK licenses.
 yes | sdkmanager --sdk_root="$SDK_DIR" --licenses >/dev/null || true
-sdkmanager --sdk_root="$SDK_DIR" \
-  "platform-tools" "platforms;android-${COMPILE_SDK:-36}" "build-tools;${COMPILE_SDK:-36}.0.0" \
-  "ndk;${NDK_VERSION}" "cmake;3.22.1" "emulator" "$SYSTEM_IMAGE"
+if [[ "$TOOLCHAIN_MINIMAL" == 1 ]]; then
+  sdkmanager --sdk_root="$SDK_DIR" \
+    "platform-tools" "platforms;android-${COMPILE_SDK:-36}" "build-tools;${COMPILE_SDK:-36}.0.0" \
+    "ndk;${NDK_VERSION}" "cmake;3.22.1"
+else
+  sdkmanager --sdk_root="$SDK_DIR" \
+    "platform-tools" "platforms;android-${COMPILE_SDK:-36}" "build-tools;${COMPILE_SDK:-36}.0.0" \
+    "ndk;${NDK_VERSION}" "cmake;3.22.1" "emulator" "$SYSTEM_IMAGE"
+fi
 
 flutter config --no-analytics --android-sdk "$SDK_DIR" --jdk-dir "$JDK_DIR" >/dev/null
 flutter precache --android
