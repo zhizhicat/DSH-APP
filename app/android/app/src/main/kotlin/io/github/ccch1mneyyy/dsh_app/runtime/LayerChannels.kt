@@ -44,7 +44,13 @@ internal object LayerChannels {
     ): JSONObject {
         val url = source.prefix + channel.githubBase + channel.indexPath
         val file = File(downloads, "layers-index.json")
-        downloader.download(url, file, channel.indexSha256)
+        try {
+            downloader.download(url, file, channel.indexSha256)
+        } catch (e: IOException) {
+            throw IOException(
+                "index fetch failed: sourceId='${source.id}' prefix='${source.prefix}' url=$url: ${e.message}", e,
+            )
+        }
         return JSONObject(file.readText())
     }
 
