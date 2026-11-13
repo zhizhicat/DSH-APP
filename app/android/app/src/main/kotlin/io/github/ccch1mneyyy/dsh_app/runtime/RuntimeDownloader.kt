@@ -70,8 +70,8 @@ internal class RuntimeDownloader(
             setTitle(part.name.removeSuffix(".part"))
             // VISIBILITY_HIDDEN(=2) 在新版 Android 只许系统应用使用，enqueue 直接抛
             // SecurityException: Invalid value for visibility: 2（真机实锤）。
-            // 改用 VISIBILITY_VISIBLE_COMPLETED(=1)：下载中显示普通通知，完成可点开。
-            setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_COMPLETED)
+            // 改用 VISIBILITY_VISIBLE_NOTIFY_COMPLETED(=1)：下载中显示普通通知，完成可点开。
+            setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
             setDestinationInExternalFilesDir(app, null, part.name)
             setAllowedOverMetered(true)
             setAllowedOverRoaming(true)
