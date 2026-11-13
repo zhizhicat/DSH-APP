@@ -91,10 +91,17 @@ class RuntimePlugin :
                 result.success(null)
             }
             "channels" -> {
+                // Variant (schema 3) channels carry an index instead of a
+                // manifest, so the flat loader skips them; merge them in so
+                // the gate and the source page can see dsh-go-layers.
                 val registry = runCatching {
-                    ChannelRegistry.load(appContext).map { c ->
+                    val flat = ChannelRegistry.load(appContext).map { c ->
                         mapOf("id" to c.id, "name" to c.name, "isDefault" to (c.id == ChannelRegistry.defaultId(appContext)))
                     }
+                    val layers = ChannelRegistry.layerChannels(appContext).map { c ->
+                        mapOf("id" to c.id, "name" to c.name, "isDefault" to (c.id == ChannelRegistry.defaultId(appContext)))
+                    }
+                    flat + layers
                 }.getOrElse { emptyList() }
                 result.success(registry)
             }
