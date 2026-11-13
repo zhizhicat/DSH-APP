@@ -41,17 +41,29 @@ PY=(python3 -I "$HERE/lib/rtbuild.py")
 
 # ---- pinned inputs (override via environment; pinned hashes then must be updated too) ----
 RUNTIME_REVISION="${RUNTIME_REVISION:-r15}"  # r14 + per-family DNS under PRoot, input recovery, session deletion and upload resolver fixes, title and boot cache work; DSH as r12
-DSH_VERSION="${DSH_VERSION:-0.2.2-rc.1}"
+DSH_VERSION="${DSH_VERSION:-}"  # empty = pull the latest from the npm registry at build time; set to pin
 NODE_VERSION="${NODE_VERSION:-24.22.1}"
 # pnpm runs DSH's plugin installs (pluginManager / `dsh plugin`); the version the DSH repo pins.
 PNPM_VERSION="${PNPM_VERSION:-11.28.5}"
 # dist.integrity of pnpm-$PNPM_VERSION.tgz, identical on registry.npmjs.org and npmmirror
 PNPM_INTEGRITY="${PNPM_INTEGRITY:-sha512-SEVj0wtMKtJ8tIqpT/KzAtvOvI/2vyiBbCWJiG4UbOf3bzVPO8GkOOb16XaMMCqgpvet2CMpA81M+BQmy8FNng==}"
+# Base rootfs: "ubuntu-<ver>" (cdimage base tar.gz) or "debian-<major>" (LXC images rootfs.tar.xz).
+# Layers CI passes one per variant; the old UBUNTU_VERSION env still works and maps to ubuntu-<ver>.
+BASE="${BASE:-}"
 UBUNTU_VERSION="${UBUNTU_VERSION:-24.04.5}"
+if [[ -z "$BASE" ]]; then BASE="ubuntu-$UBUNTU_VERSION"; fi
+DISTRO="${BASE%%-*}"
+BASE_VER="${BASE#*-}"
+case "$DISTRO" in
+  ubuntu) UBUNTU_VERSION="$BASE_VER"; APT_CODENAME="$([[ "$BASE_VER" == 24.* ]] && echo noble || echo resolute)" ;;
+  debian) UBUNTU_VERSION=""; APT_CODENAME="$([[ "$BASE_VER" == 12 ]] && echo bookworm || echo trixie)" ;;
+  *) die "unsupported BASE distro: $BASE" ;;
+esac
+LXC_DATE="${LXC_DATE:-20261112_05:24}"   # lxc-images build stamp for debian rootfs pins
 PROOT_VERSION="5.1.107.98"
 TALLOC_VERSION="2.5.0"
 SHMEM_VERSION="0.7"
-UBUNTU_EXTRA="${UBUNTU_EXTRA:-tzdata ca-certificates git}"   # extra noble debs (+ dependency closure)
+UBUNTU_EXTRA="${UBUNTU_EXTRA:-tzdata ca-certificates git}"   # extra base-distro debs (+ dependency closure)
 PYTHON_VERSION="${PYTHON_VERSION:-3.12.15}"
 PBS_RELEASE="${PBS_RELEASE:-20261021}"    # astral-sh/python-build-standalone release tag
 COMPRESS="${COMPRESS:-xz}"          # xz | gz
@@ -60,10 +72,12 @@ XZ_THREADS="${XZ_THREADS:-4}"       # xz 5.8.1 -6, 136704-byte sample: -T1=408 B
 PRUNE_DEV_METADATA="${PRUNE_DEV_METADATA:-1}"   # drop *.map / *.d.ts from node_modules
 SOURCE_DATE_EPOCH="${SOURCE_DATE_EPOCH:-1767225600}"  # 2026-01-01T00:00:00Z, fixed tar mtimes
 
-UBUNTU_MIRROR="https://mirrors.tuna.tsinghua.edu.cn/ubuntu-cdimage/ubuntu-base/releases/24.04/release"
+UBUNTU_MIRROR="https://mirrors.tuna.tsinghua.edu.cn/ubuntu-cdimage/ubuntu-base/releases/${BASE_VER%%.*}/release"  # ubuntu BASE only
 NODE_MIRROR="https://npmmirror.com/mirrors/node"
 NPM_REGISTRY="https://registry.npmmirror.com"
 TERMUX_REPO="https://packages.termux.dev/apt/termux-main"
+DEBIAN_LXC_MIRROR="https://mirrors.tuna.tsinghua.edu.cn/lxc-images/images/debian"  # debian BASE: <codename>/<arch>/default/<LXC_DATE>/rootfs.tar.xz
+DEBIAN_ARCHIVE="https://mirrors.tuna.tsinghua.edu.cn/debian"                      # debian BASE: one pool serves both architectures
 UBUNTU_ARCHIVE_AMD64="https://mirrors.tuna.tsinghua.edu.cn/ubuntu"        # InRelease verified with gpgv
 UBUNTU_ARCHIVE_ARM64="https://mirrors.tuna.tsinghua.edu.cn/ubuntu-ports"
 UBUNTU_DEB_FALLBACK="https://launchpad.net/ubuntu/+archive/primary/+files"
@@ -75,6 +89,9 @@ PBS_MIRROR="https://registry.npmmirror.com/-/binary/python-build-standalone"
 declare -A PIN=(
   [ubuntu-base-24.04.5-base-arm64.tar.gz]=a91d5a93010193712d346d761372b7c9db6dfcf093893161c64ca107f05914f2
   [ubuntu-base-24.04.5-base-amd64.tar.gz]=e77b6f10c2590cef872b33ee9f635a0e3fd1f57fb074c0e52b5c7f56147a0c86
+  # debian LXC rootfs (sha256 computed at pin time; lxc-images publishes no SHA256SUMS, so these are mandatory)
+  [debian-rootfs-12-20261112_05:24-arm64.tar.xz]=c8954d0a514f104ad1ccf6c3ec2dafc5952f8ceae0e844d7d77275ad5e9115f4
+  [debian-rootfs-13-20261112_05:24-arm64.tar.xz]=24f442b0ab89fd1e302d149e71647f91735d34eec88430fc1b9d122ae2a546b7
   [node-v24.22.1-linux-arm64.tar.xz]=dbabf7a1cbf947e6059ffad2c27b80041db97dea1e553b62afdee7f13fca336e
   [node-v24.22.1-linux-x64.tar.xz]=6c172a9ab6718f7b801fb5a7bd486af2ee5e32758086a04b84fcce2aa77095e6
   [proot_5.1.107.98_aarch64.deb]=29de40efea4daa2a6168b617915206511c63e8d46bf5f4b07d48723441ef7f3b
@@ -146,6 +163,23 @@ pin_of() {
 # ---------------------------------------------------------------------------
 # inputs
 # ---------------------------------------------------------------------------
+rootfs_base() {  # $1 = distro arch (arm64|amd64); echoes path to the verified base rootfs tarball
+  case "$DISTRO" in
+    ubuntu) ubuntu_base "$1" ;;
+    debian) debian_base "$1" ;;
+  esac
+}
+
+debian_base() {  # LXC images rootfs; no upstream SHA256SUMS exists, so a PIN entry is mandatory
+  local arch="$1" name="debian-rootfs-$BASE_VER-$LXC_DATE-$arch.tar.xz"
+  local dir="$CACHE/debian/$BASE_VER"
+  local pin; pin="$(pin_of "$name")"
+  [[ -n "$pin" ]] || die "no sha256 PIN for $name — lxc-images publishes no checksums; compute and add one"
+  local codename; codename="$APT_CODENAME"
+  fetch "$DEBIAN_LXC_MIRROR/$codename/$arch/default/$LXC_DATE/rootfs.tar.xz" "$dir/$name" "$pin"
+  printf '%s' "$dir/$name"
+}
+
 ubuntu_base() {  # $1 = ubuntu arch; echoes path
   local arch="$1" name="ubuntu-base-${UBUNTU_VERSION}-base-$1.tar.gz"
   local dir="$CACHE/ubuntu/$UBUNTU_VERSION"
@@ -193,28 +227,41 @@ termux_deb() {  # $1 = package, $2 = version, $3 = termux arch; echoes path
 }
 
 # Extra Ubuntu noble packages (tzdata, ca-certificates, git and their dependency closure).
-# Chain of trust: InRelease of noble / noble-updates / noble-security verified with gpgv against
-# ubuntu-archive-keyring.gpg from the checksum-verified Ubuntu Base tarball -> Packages.xz hash
-# -> each .deb hash. The resolved set is pinned in runtime/locks/ubuntu-noble-<arch>.json
+# Chain of trust: InRelease of <codename> / <codename>-updates / <codename>-security verified with
+# gpgv against the archive keyring extracted from the checksum-verified base rootfs -> Packages.xz
+# hash -> each .deb hash. The resolved set is pinned in runtime/locks/<base>-<arch>.json
 # (re-resolve with UPDATE_DEB_LOCK=1).
-ubuntu_extra_debs() {  # $1 = ubuntu arch, $2 = verified base tarball; echoes deb paths, one per line
-  local arch="$1" base="$2" lock="$LOCKS/ubuntu-noble-$1.json" mirror
-  [[ "$arch" == amd64 ]] && mirror="$UBUNTU_ARCHIVE_AMD64" || mirror="$UBUNTU_ARCHIVE_ARM64"
+extra_debs() {  # $1 = distro arch, $2 = verified base tarball; echoes deb paths, one per line
+  local arch="$1" base="$2" lock="$LOCKS/$BASE-$1.json" mirror keyring_name
+  case "$DISTRO" in
+    ubuntu)
+      [[ "$arch" == amd64 ]] && mirror="$UBUNTU_ARCHIVE_AMD64" || mirror="$UBUNTU_ARCHIVE_ARM64"
+      keyring_name="ubuntu-archive-keyring.gpg"
+      ;;
+    debian)
+      mirror="$DEBIAN_ARCHIVE"   # one pool serves both architectures
+      keyring_name="debian-archive-keyring.gpg"
+      ;;
+  esac
   if [[ ! -f "$lock" || "${UPDATE_DEB_LOCK:-0}" == 1 ]] || \
      ! python3 -I -c 'import json,sys; sys.exit(json.load(open(sys.argv[1]))["want"] != sys.argv[2].split())' "$lock" "$UBUNTU_EXTRA"; then
-    command -v gpgv >/dev/null || die "gpgv is required to resolve Ubuntu packages"
-    local dir="$CACHE/ubuntu/dists-$arch"; rm -rf "$dir"; mkdir -p "$dir"
-    python3 -I - "$base" "$dir/archive-keyring.gpg" <<'PYEOF'
+    command -v gpgv >/dev/null || die "gpgv is required to resolve $DISTRO packages"
+    local dir="$CACHE/$DISTRO/dists-$arch"; rm -rf "$dir"; mkdir -p "$dir"
+    python3 -I - "$base" "$dir/archive-keyring.gpg" "$keyring_name" <<'PYEOF'
 import sys, tarfile
-with tarfile.open(sys.argv[1], "r:gz") as t:
+with tarfile.open(sys.argv[1], "r:*") as t:
     for m in t:
-        if m.name.lstrip("./") == "usr/share/keyrings/ubuntu-archive-keyring.gpg":
+        if m.name.lstrip("./") == "usr/share/keyrings/" + sys.argv[3]:
             open(sys.argv[2], "wb").write(t.extractfile(m).read()); break
     else:
         sys.exit("keyring not found in base tarball")
 PYEOF
-    local -a idx=() ; local suite want
-    for suite in noble noble-updates noble-security; do
+    local -a idx=() ; local suite want suites=()
+    case "$DISTRO" in
+      ubuntu) suites=("$APT_CODENAME" "$APT_CODENAME-updates" "$APT_CODENAME-security") ;;
+      debian) suites=("$APT_CODENAME" "$APT_CODENAME-updates" "$APT_CODENAME-security") ;;
+    esac
+    for suite in "${suites[@]}"; do
       fetch "$mirror/dists/$suite/InRelease" "$dir/$suite.InRelease"
       gpgv --keyring "$dir/archive-keyring.gpg" "$dir/$suite.InRelease" 2>/dev/null \
         || die "InRelease signature check failed for $suite"
@@ -233,8 +280,8 @@ PYEOF
   while read -r file sum; do
     name="$(basename "$file")"
     # Superseded versions can leave the mirror; keep the locked bytes and hash.
-    fetch "$mirror/$file" "$CACHE/ubuntu/debs/$name" "$sum" "$UBUNTU_DEB_FALLBACK/$name"
-    printf '%s\n' "$CACHE/ubuntu/debs/$name"
+    fetch "$mirror/$file" "$CACHE/$DISTRO/debs/$name" "$sum"
+    printf '%s\n' "$CACHE/$DISTRO/debs/$name"
   done
 }
 
@@ -379,11 +426,11 @@ build_abi() {
   mkdir -p "$assets/licenses" "$jni"
 
   local base node proot_deb talloc_deb shmem_deb proot_src
-  base="$(ubuntu_base "$ubuntu_arch")"
+  base="$(rootfs_base "$ubuntu_arch")"
   node="$(node_dist "$node_arch")"
-  ubuntu_extra_debs "$ubuntu_arch" "$base" > "$work/extra-debs.txt"   # set -e aborts on any failure inside
+  extra_debs "$ubuntu_arch" "$base" > "$work/extra-debs.txt"   # set -e aborts on any failure inside
   local -a extra_debs=(); mapfile -t extra_debs < "$work/extra-debs.txt"
-  [[ ${#extra_debs[@]} -gt 0 ]] || die "Ubuntu package resolution produced nothing"
+  [[ ${#extra_debs[@]} -gt 0 ]] || die "base-distro package resolution produced nothing"
   local python; python="$(python_dist "$termux_arch")"
   if [[ -n "$JNILIBS_RESTORE_DIR" ]]; then
     # Termux pool rotated past our pins; restore the four container .so files
@@ -506,16 +553,16 @@ PYEOF
   local pnpm_lockfile="$LOCKS/pnpm-$PNPM_VERSION/package-lock.json"
   local inputs_sha
   inputs_sha="$( {
-      echo "$RUNTIME_REVISION $abi $DSH_VERSION $NODE_VERSION $PNPM_VERSION $UBUNTU_VERSION $COMPRESS $XZ_PRESET $XZ_THREADS $PRUNE_DEV_METADATA $SOURCE_DATE_EPOCH $RUNTIME_LAYERS"
+      echo "$RUNTIME_REVISION $abi $DSH_VERSION $NODE_VERSION $PNPM_VERSION $BASE $COMPRESS $XZ_PRESET $XZ_THREADS $PRUNE_DEV_METADATA $SOURCE_DATE_EPOCH $RUNTIME_LAYERS"
       sha256 "$base"; sha256 "$node"; sha256 "$python"; sha256sum "${extra_debs[@]}" | cut -d' ' -f1
       sha256 "$proot_deb"; sha256 "$talloc_deb"; sha256 "$shmem_deb"
       sha256 "$lockfile"; sha256 "$pnpm_lockfile"; sha256 "$HERE/build-runtime.sh"; sha256 "$HERE/lib/rtbuild.py"
       (cd "$HERE" && find patches bridge boot direct session-deletion -type f -print0 | LC_ALL=C sort -z | xargs -0 sha256sum)
     } | sha256sum | cut -c1-12 )"
-  local runtime_version="${RUNTIME_REVISION}-dsh${DSH_VERSION}-node${NODE_VERSION}-ubuntu${UBUNTU_VERSION}-${inputs_sha}"
+  local runtime_version="${RUNTIME_REVISION}-dsh${DSH_VERSION}-node${NODE_VERSION}-base${BASE}-${inputs_sha}"
   local runtime_info
   runtime_info="$(printf '{"runtimeVersion":"%s","abi":"%s","dshVersion":"%s","nodeVersion":"%s","pnpmVersion":"%s","ubuntuVersion":"%s","prootVersion":"%s","dshPatches":%s,"dshGoBridge":"%s"}' \
-    "$runtime_version" "$abi" "$DSH_VERSION" "$NODE_VERSION" "$PNPM_VERSION" "$UBUNTU_VERSION" "$PROOT_VERSION" \
+    "$runtime_version" "$abi" "$DSH_VERSION" "$NODE_VERSION" "$PNPM_VERSION" "$BASE" "$PROOT_VERSION" \
     "$(cat "$work/dsh-patches.json")" "$bridge_version")"
 
   # -- rootfs archive --
@@ -526,7 +573,7 @@ PYEOF
     archive_args=(--base-out "${archives[0]}" --engine-out "${archives[1]}" --base-cache "$BASE_LAYER_CACHE")
   elif [[ "$RUNTIME_LAYERS" == 3 ]]; then
     # Variant naming: base carries the distro, node its version, engine the DSH pin.
-    archives=("$assets/base-ubuntu-${UBUNTU_VERSION}-$abi.tar.$COMPRESS" \
+    archives=("$assets/base-${BASE}-$abi.tar.$COMPRESS" \
               "$assets/node-v${NODE_VERSION}-$abi.tar.$COMPRESS" \
               "$assets/engine-dsh${DSH_VERSION}-$abi.tar.$COMPRESS")
     archive_args=(--base-out "${archives[0]}" --node-out "${archives[1]}" --engine-out "${archives[2]}" --base-cache "$BASE_LAYER_CACHE")
@@ -540,7 +587,7 @@ PYEOF
 
   local versions
   versions="$(printf '{"runtimeVersion":"%s","dshVersion":"%s","nodeVersion":"%s","pnpmVersion":"%s","ubuntuVersion":"%s","prootVersion":"%s","tallocVersion":"%s","androidShmemVersion":"%s","dshPatches":%s,"dshGoBridge":"%s","build":{"inputsSha256_12":"%s","ubuntuBaseSha256":"%s","nodeSha256":"%s","dshLockSha256":"%s","pnpmIntegrity":"%s","sourceDateEpoch":%s}}' \
-    "$runtime_version" "$DSH_VERSION" "$NODE_VERSION" "$PNPM_VERSION" "$UBUNTU_VERSION" "$PROOT_VERSION" "$TALLOC_VERSION" "$SHMEM_VERSION" \
+    "$runtime_version" "$DSH_VERSION" "$NODE_VERSION" "$PNPM_VERSION" "$BASE" "$PROOT_VERSION" "$TALLOC_VERSION" "$SHMEM_VERSION" \
     "$(cat "$work/dsh-patches.json")" "$bridge_version" \
     "$inputs_sha" "$(sha256 "$base")" "$(sha256 "$node")" "$(sha256 "$lockfile")" "$PNPM_INTEGRITY" "$SOURCE_DATE_EPOCH")"
   if [[ "$RUNTIME_LAYERS" == 3 ]]; then
@@ -548,7 +595,7 @@ PYEOF
     # when the layers index is aggregated), and a per-variant manifest for records.
     mkdir -p "$OUT/variants"
     "${PY[@]}" manifest --abi "$abi" --report "$out/build-report.json" --jnilibs "$work/jnilibs.json" \
-      --versions "$versions" --out "$OUT/variants/manifest-${UBUNTU_VERSION}-${NODE_VERSION}-${DSH_VERSION}-$abi.json" >&2
+      --versions "$versions" --out "$OUT/variants/manifest-${BASE}-${NODE_VERSION}-${DSH_VERSION}-$abi.json" >&2
     python3 - "$out/build-report.json" "$OUT/layers-$abi.jsonl" <<'PYV'
 import json, sys
 report = json.load(open(sys.argv[1]))
@@ -615,7 +662,7 @@ for abi in abis:
     for line in open(path):
         rec = json.loads(line)
         base = rec["layers"]["base"]; node = rec["layers"]["node"]; engine = rec["layers"]["engine"]
-        uv = (rec.get("ubuntuVersion") or "").replace("ubuntu-", "")
+        uv = rec.get("ubuntuVersion") or ""   # full BASE spec, e.g. "ubuntu-24.04.5" / "debian-12"
         nv = (rec.get("nodeVersion") or "").replace("node-v", "")
         if uv: layers["base"][uv] = dict(base, abi=abi)
         if nv: layers["node"][nv] = dict(node, abi=abi)
@@ -636,7 +683,7 @@ for abi in abis:
                         if k in m}
 index = {"schema": 3, "generatedBy": "build-runtime.sh RUNTIME_LAYERS=3",
          "layers": layers, "abis": per_abi,
-         "notes": "layers.* keys: base=ubuntu version, node=node version, engine=dsh version; "
+         "notes": "layers.* keys: base=<distro>-<ver>, node=node version, engine=dsh version; "
                   "archives unpack in order base -> node -> engine (later entries win)"}
 dest = os.path.join(out, name)
 json.dump(index, open(dest, "w"), indent=2, sort_keys=True)
@@ -648,13 +695,30 @@ main() {
   local -a abis=("$@")
   [[ ${#abis[@]} -gt 0 ]] || abis=(x86_64 arm64-v8a)
   mkdir -p "$CACHE" "$WORK" "$OUT"
-  local abi
+  # DSH pin: empty = resolve the latest published version from the npm registry.
+  # A registry failure dies here (before any packaging), leaving the previous release untouched.
+  if [[ -z "$DSH_VERSION" ]]; then
+    DSH_VERSION="$(PATH="$(host_npm):$PATH" npm view @deepseek-ai/dsh version --registry "$NPM_REGISTRY" --userconfig "$WORK/empty-user-npmrc" --globalconfig "$WORK/empty-global-npmrc" 2>/dev/null)" \
+      || die "cannot resolve @deepseek-ai/dsh latest version from $NPM_REGISTRY"
+    [[ "$DSH_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.]+)?$ ]] || die "npm returned a suspicious DSH version: $DSH_VERSION"
+    log "DSH unpinned: resolved upstream latest @deepseek-ai/dsh@$DSH_VERSION"
+  fi
   if [[ "$RUNTIME_LAYERS" == 3 && -n "$RUNTIME_VARIANTS" ]]; then
-    # RUNTIME_VARIANTS: space-separated ubuntu:node pairs, e.g. "24.04.5:24.22.1 24.04.5:24.9.0"
-    local pair
+    # RUNTIME_VARIANTS: space-separated base:node pairs, e.g.
+    #   "ubuntu-24.04.5:24.22.1 debian-12:24.22.1 debian-13:24.22.1 ubuntu-26.04.1:24.22.1"
+    # A bare version ("24.04.5:...") still works and maps to ubuntu-<ver>.
+    local pair base_spec
     for pair in $RUNTIME_VARIANTS; do
-      UBUNTU_VERSION="${pair%%:*}"; NODE_VERSION="${pair##*:}"
-      log "variant ubuntu=$UBUNTU_VERSION node=$NODE_VERSION dsh=$DSH_VERSION"
+      base_spec="${pair%%:*}"; NODE_VERSION="${pair##*:}"
+      BASE="$base_spec"
+      [[ "$BASE" != *-* ]] && BASE="ubuntu-$BASE"
+      DISTRO="${BASE%%-*}"; BASE_VER="${BASE#*-}"
+      case "$DISTRO" in
+        ubuntu) UBUNTU_VERSION="$BASE_VER"; APT_CODENAME="$([[ "$BASE_VER" == 24.* ]] && echo noble || echo resolute)" ;;
+        debian) UBUNTU_VERSION=""; APT_CODENAME="$([[ "$BASE_VER" == 12 ]] && echo bookworm || echo trixie)" ;;
+        *) die "unsupported BASE distro: $BASE" ;;
+      esac
+      log "variant base=$BASE node=$NODE_VERSION dsh=$DSH_VERSION"
       for abi in "${abis[@]}"; do build_abi "$abi"; done
     done
     write_layers_index "${abis[@]}"

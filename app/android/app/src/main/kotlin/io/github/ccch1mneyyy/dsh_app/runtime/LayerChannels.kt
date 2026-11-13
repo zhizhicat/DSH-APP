@@ -84,7 +84,7 @@ internal object LayerChannels {
 
         val manifest = JSONObject()
         manifest.put("schema", 2)
-        manifest.put("runtimeVersion", "layers-dsh$engineKey-node$nodeKey-ubuntu$baseKey")
+        manifest.put("runtimeVersion", "layers-dsh$engineKey-node$nodeKey-base$baseKey")
         manifest.put("abi", abi)
         manifest.put("dshVersion", abiInfo.optString("dshVersion", engineKey))
         manifest.put("nodeVersion", nodeKey)

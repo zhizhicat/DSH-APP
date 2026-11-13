@@ -543,7 +543,8 @@ def parse_stanzas(text):
 
 
 def base_status(base_tar):
-    with tarfile.open(base_tar, "r:gz") as t:
+    # "r:*" accepts both Ubuntu base (.tar.gz) and Debian LXC rootfs (.tar.xz)
+    with tarfile.open(base_tar, "r:*") as t:
         for m in t:
             if norm_member(m.name) == "var/lib/dpkg/status":
                 return parse_stanzas(t.extractfile(m).read().decode())
@@ -1280,7 +1281,7 @@ def cmd_assemble(args):
 
     # 1. Ubuntu Base
     hardlinks = []
-    with tarfile.open(args.base, "r:gz") as t:
+    with tarfile.open(args.base, "r:*") as t:
         for m in t:
             p = norm_member(m.name)
             if not p:

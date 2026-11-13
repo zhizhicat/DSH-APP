@@ -9,14 +9,15 @@
 # 从官方 release APK 1:1 还原（与层内容无关，仅 manifest 元数据需要它的 sha/bytes）。
 #
 # 用法（CI 或本地）：
-#   RUNTIME_VARIANTS="24.04.5:24.22.1 24.04.5:24.9.0 24.04.5:26.13.1" \
+#   RUNTIME_VARIANTS="ubuntu-24.04.5:24.22.1 debian-12:24.22.1 debian-13:24.22.1 ubuntu-26.04.1:24.22.1" \
 #   bash runtime/build-layers.sh
+# DSH_VERSION 留空（默认）= 构建时拉 npm 上游 latest；要回滚时设具体版本号 pin。
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 source "$HERE/build-runtime.sh"
 
 RUNTIME_LAYERS=3
-: "${RUNTIME_VARIANTS:?set RUNTIME_VARIANTS, e.g. '24.04.5:24.22.1 24.04.5:24.9.0'}"
+: "${RUNTIME_VARIANTS:?set RUNTIME_VARIANTS, e.g. 'ubuntu-24.04.5:24.22.1 debian-12:24.22.1'}"
 OFFICIAL_APK_URL="${OFFICIAL_APK_URL:-https://github.com/ccch1mneyyy/dsh-Go/releases/download/v1.0.15/dsh-go-1.0.15-arm64.apk}"
 
 mkdir -p "$CACHE" "$WORK" "$OUT"
@@ -44,11 +45,27 @@ if [[ ! -f "$restore_dir/.done" ]]; then
 fi
 export JNILIBS_RESTORE_DIR="$restore_dir"
 
-# -- 变体循环（UBUNTU_VERSION/NODE_VERSION 由 build_abi 消费） --
+# DSH pin: empty = resolve the latest published version from the npm registry.
+if [[ -z "$DSH_VERSION" ]]; then
+  bin="$(host_npm)"
+  DSH_VERSION="$(PATH="$bin:$PATH" npm view @deepseek-ai/dsh version --registry "$NPM_REGISTRY" 2>/dev/null)" \
+    || die "cannot resolve @deepseek-ai/dsh latest version from $NPM_REGISTRY"
+  [[ "$DSH_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.]+)?$ ]] || die "npm returned a suspicious DSH version: $DSH_VERSION"
+  log "DSH unpinned: resolved upstream latest @deepseek-ai/dsh@$DSH_VERSION"
+fi
+
+# -- 变体循环（BASE/NODE_VERSION 由 build_abi 消费） --
 for pair in $RUNTIME_VARIANTS; do
-  UBUNTU_VERSION="${pair%%:*}"
-  NODE_VERSION="${pair##*:}"
-  log "=== variant ubuntu=$UBUNTU_VERSION node=$NODE_VERSION dsh=$DSH_VERSION ==="
+  base_spec="${pair%%:*}"; NODE_VERSION="${pair##*:}"
+  BASE="$base_spec"
+  [[ "$BASE" != *-* ]] && BASE="ubuntu-$BASE"
+  DISTRO="${BASE%%-*}"; BASE_VER="${BASE#*-}"
+  case "$DISTRO" in
+    ubuntu) UBUNTU_VERSION="$BASE_VER"; APT_CODENAME="$([[ "$BASE_VER" == 24.* ]] && echo noble || echo resolute)" ;;
+    debian) UBUNTU_VERSION=""; APT_CODENAME="$([[ "$BASE_VER" == 12 ]] && echo bookworm || echo trixie)" ;;
+    *) die "unsupported BASE distro: $BASE" ;;
+  esac
+  log "=== variant base=$BASE node=$NODE_VERSION dsh=$DSH_VERSION ==="
   build_abi "$abi"
 done
 

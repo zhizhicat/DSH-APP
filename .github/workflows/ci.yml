@@ -226,10 +226,19 @@ jobs:
         if: steps.runtime-prefixes.outputs.cache-hit != 'true'
         run: |
           version=$(sed -nE 's/^DSH_VERSION="\$\{DSH_VERSION:-(.+)\}"$/\1/p' runtime/build-runtime.sh)
+          if [ -z "$version" ]; then
+            # DSH_VERSION unpinned = pull upstream latest (same rule as the layers build)
+            version=$(npm view @deepseek-ai/dsh version --registry https://registry.npmmirror.com)
+          fi
           prefix="$RUNNER_TEMP/dsh"
           mkdir "$prefix"
-          cp "runtime/locks/dsh-$version/package.json" "runtime/locks/dsh-$version/package-lock.json" "$prefix/"
-          npm ci --prefix "$prefix" --ignore-scripts --no-audit --no-fund
+          if [ -f "runtime/locks/dsh-$version/package-lock.json" ]; then
+            cp "runtime/locks/dsh-$version/package.json" "runtime/locks/dsh-$version/package-lock.json" "$prefix/"
+            npm ci --prefix "$prefix" --ignore-scripts --no-audit --no-fund
+          else
+            # Upstream moved past the pinned lock: install fresh (same as the layers build).
+            npm install --prefix "$prefix" --ignore-scripts --no-audit --no-fund --save-exact "@deepseek-ai/dsh@$version"
+          fi
           cp "$prefix/node_modules/@deepseek-ai/dsh-fs-local/lib/index.js" "$prefix/fs-local-original.js"
           python3 -I runtime/lib/rtbuild.py patch-dsh --prefix "$prefix" --dsh-version "$version"
           pnpm_version=$(sed -nE 's/^PNPM_VERSION="\$\{PNPM_VERSION:-(.+)\}"$/\1/p' runtime/build-runtime.sh)
