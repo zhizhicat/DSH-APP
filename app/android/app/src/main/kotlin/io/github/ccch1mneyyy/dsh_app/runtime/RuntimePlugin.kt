@@ -6,6 +6,7 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import java.io.File
 import android.os.Build
 import android.os.PowerManager
 import android.provider.Settings
@@ -137,7 +138,7 @@ class RuntimePlugin :
                         val downloads = File(appContext.cacheDir, "runtime-downloads")
                         downloads.mkdirs()
                         val index = LayerChannels.fetchIndex(channel, source, downloads,
-                            RuntimeDownloader({}) {})
+                            RuntimeDownloader(onLog = {}, isCancelled = { false }))
                         result.success(index.toString())
                     } catch (e: Exception) {
                         result.error("index_failed", e.message, null)
