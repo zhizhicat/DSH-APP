@@ -101,8 +101,30 @@ class RuntimeInstallController extends Notifier<bool> {
           ? null
           : channels.firstWhere((c) => c.isDefault, orElse: () => channels.first);
       if (channel != null) {
-        await installChannel(channel);
-        return;
+        if (channel.id.contains('layers')) {
+          // The default is a variant channel: install with the saved (or
+          // first) source and a default layer selection, not the flat loader.
+          final sources = await runtime.channelSources();
+          if (sources.isNotEmpty) {
+            final prefs = await LocalRuntimeController.loadVariantPrefs();
+            final sourceId = sources.any((s) => s.id == prefs.sourceId)
+                ? prefs.sourceId
+                : sources.first.id;
+            final index = await runtime.layersIndex(channel.id, sourceId);
+            if (index != null) {
+              await installVariant(sourceId, LayersChoice(
+                base: index.base.first.key,
+                node: index.node.first.key,
+                engine: index.engine.first.key,
+              ));
+              return;
+            }
+          }
+          // No mirror/index reachable: fall back to the flat channel below.
+        } else {
+          await installChannel(channel);
+          return;
+        }
       }
     } catch (_) {
       // No channel registry or no reachable list: fall through and let the
