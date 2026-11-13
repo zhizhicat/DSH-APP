@@ -640,8 +640,10 @@ class RuntimeBridge {
   }
 
   /// The layers index for a variant channel (raw JSON string; parsed in the state layer).
-  Future<String> layerChannelIndex(String channelId, String sourceId) =>
-      _methods.invokeMethod<String>('layerChannelIndex', {'channelId': channelId, 'sourceId': sourceId});
+  Future<String> layerChannelIndex(String channelId, String sourceId) async {
+    final raw = await _methods.invokeMethod<String>('layerChannelIndex', {'channelId': channelId, 'sourceId': sourceId});
+    return raw ?? '';
+  }
 
   /// Installs a variant channel by layer selection. Download/extract progress
   /// arrives on the events stream like installChannel.
