@@ -97,6 +97,56 @@ class RuntimePlugin :
                 }.getOrElse { emptyList() }
                 result.success(registry)
             }
+            "channelSources" -> {
+                result.success(runCatching {
+                    ChannelRegistry.sources(appContext).map { s ->
+                        mapOf("id" to s.id, "name" to s.name, "prefix" to s.prefix)
+                    }
+                }.getOrElse { emptyList() })
+            }
+            "probeChannelSource" -> {
+                val url = call.argument<String>("url")
+                    ?: return result.error("bad_args", "url required", null)
+                Thread { result.success(LayerChannels.probe(url)) }.start()
+            }
+            "layerChannelIndex" -> {
+                val channelId = call.argument<String>("channelId")
+                val sourceId = call.argument<String>("sourceId") ?: ""
+                if (channelId.isNullOrEmpty()) return result.error("bad_args", "channelId required", null)
+                Thread {
+                    try {
+                        val channel = ChannelRegistry.layerChannels(appContext)
+                            .firstOrNull { it.id == channelId }
+                            ?: throw java.io.IOException("unknown layer channel")
+                        val source = ChannelRegistry.sources(appContext)
+                            .firstOrNull { it.id == sourceId } ?: ChannelRegistry.Source(sourceId, sourceId, "")
+                        val downloads = File(appContext.cacheDir, "runtime-downloads")
+                        downloads.mkdirs()
+                        val index = LayerChannels.fetchIndex(channel, source, downloads,
+                            RuntimeDownloader({}) {})
+                        result.success(index.toString())
+                    } catch (e: Exception) {
+                        result.error("index_failed", e.message, null)
+                    }
+                }.start()
+            }
+            "installLayerChannel" -> {
+                val id = call.argument<String>("channelId")
+                val sourceId = call.argument<String>("sourceId") ?: ""
+                val base = call.argument<String>("base")
+                val node = call.argument<String>("node")
+                val engine = call.argument<String>("engine")
+                if (id.isNullOrEmpty() || base.isNullOrEmpty() || node.isNullOrEmpty() || engine.isNullOrEmpty()) {
+                    return result.error("bad_args", "channelId/base/node/engine required", null)
+                }
+                if (controller.phase == RuntimeController.Phase.INSTALLING) return result.error("install_busy", null, null)
+                val intent = Intent(appContext, DshService::class.java).setAction(DshService.ACTION_INSTALL)
+                appContext.startForegroundService(intent)
+                controller.installLayerChannel(id, sourceId, base, node, engine) { error ->
+                    appContext.startService(Intent(appContext, DshService::class.java).setAction(DshService.ACTION_INSTALL_DONE))
+                    if (error == null) result.success(null) else result.error("install_failed", error.message, null)
+                }
+            }
             "installChannel" -> {
                 val id = call.argument<String>("id")
                 if (id.isNullOrEmpty()) return result.error("bad_args", "channel id required", null)

@@ -359,6 +359,71 @@ class RuntimeController private constructor(private val app: Context) : DshProce
         }
     }
 
+    /**
+     * Variant channel install (schema 3): fetch the layers index through the
+     * chosen mirror, synthesize a base+node+engine manifest from the person's
+     * selection, then download and unpack over each other like any channel.
+     */
+    @Synchronized fun installLayerChannel(
+        channelId: String, sourceId: String, baseKey: String, nodeKey: String, engineKey: String,
+        onDone: (Throwable?) -> Unit,
+    ) {
+        if (phase == Phase.INSTALLING) return onDone(null)
+        if (process != null || resetting || phase in setOf(Phase.STARTING, Phase.RUNNING, Phase.STOPPING)) {
+            return onDone(RuntimeUpgradeBlocked("running"))
+        }
+        setPhase(Phase.INSTALLING)
+        worker.execute {
+            try {
+                val channel = ChannelRegistry.layerChannels(app).firstOrNull { it.id == channelId }
+                    ?: throw IOException("unknown layer channel: $channelId")
+                val source = ChannelRegistry.sources(app).firstOrNull { it.id == sourceId }
+                    ?: ChannelRegistry.Source(sourceId, sourceId, "")
+                val downloads = File(app.cacheDir, "runtime-downloads")
+                downloads.mkdirs()
+                val downloader = RuntimeDownloader(::note) { isCancelledDownloads() }
+                log("[dsh-app] channel ${channel.id} via ${source.id}: fetching layers index", "system")
+                val index = LayerChannels.fetchIndex(channel, source, downloads, downloader)
+                val m = RuntimeManifest.fromJson(
+                    LayerChannels.buildManifest(index, "arm64-v8a", baseKey, nodeKey, engineKey))
+                synchronized(this) { channelManifest = m }
+                val inst = RuntimeInstaller(app, m, ::note, source = FileArchiveSource(downloads))
+                    .also { channelInstaller = it }
+                log("[dsh-app] layers ${baseKey}/${nodeKey}/${engineKey}: downloading ${m.archives.size} layer(s) " +
+                    "(${m.archives.sumOf { it.bytes }.let { b -> if (b > 0) b / (1024 * 1024) else -1 }}MB)", "system")
+                for (archive in m.archivesForInstall(false)) {
+                    downloader.download(
+                        source.prefix + channel.githubBase + archive.asset,
+                        File(downloads, archive.asset), archive.sha256, archive.bytes,
+                    ) { done, total ->
+                        emit(mapOf("type" to "progress", "step" to "download", "done" to done, "total" to total))
+                    }
+                }
+                log("[dsh-app] unpacking runtime ${m.runtimeVersion} (${m.abi})", "system")
+                val started = System.currentTimeMillis()
+                if (inst.rootfs.exists() && !DshProcess(app, m, inst.rootfs, this).killStrays()) {
+                    throw RuntimeUpgradeBlocked("running")
+                }
+                inst.install(dropKept = false) { done, total ->
+                    emit(mapOf("type" to "progress", "step" to "extract", "done" to done, "total" to total))
+                }
+                log("[dsh-app] runtime ready in ${(System.currentTimeMillis() - started) / 1000}s", "system")
+                error = null
+                strikes = 0
+                failure = null
+                prefs.edit().putInt(K_STRIKES, 0).remove(K_FAILURE).apply()
+                setPhase(Phase.INSTALLED)
+                downloads.deleteRecursively()
+                main.post { onDone(null) }
+            } catch (e: Throwable) {
+                error = "install failed: ${e.message}"
+                log("[dsh-app] ${error}", "system")
+                setPhase(Phase.ERROR)
+                main.post { onDone(e) }
+            }
+        }
+    }
+
     private fun isCancelledDownloads(): Boolean = false // v1: no UI cancel; future: DshService action
 
     /**

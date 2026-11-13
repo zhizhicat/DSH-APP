@@ -93,7 +93,7 @@ log() { printf '\033[1;34m[runtime %s]\033[0m %s\n' "$(date +%H:%M:%S)" "$*" >&2
 die() { printf '\033[1;31m[runtime] error:\033[0m %s\n' "$*" >&2; exit 1; }
 sha256() { sha256sum "$1" | cut -d' ' -f1; }
 
-case "$RUNTIME_LAYERS" in 0|1) ;; *) die "RUNTIME_LAYERS must be 0 or 1" ;; esac
+case "$RUNTIME_LAYERS" in 0|1|3) ;; *) die "RUNTIME_LAYERS must be 0, 1 or 3" ;; esac
 
 for tool in curl sha256sum python3 tar xz; do
   command -v "$tool" >/dev/null || die "missing host tool: $tool"
@@ -381,6 +381,42 @@ build_abi() {
   local -a extra_debs=(); mapfile -t extra_debs < "$work/extra-debs.txt"
   [[ ${#extra_debs[@]} -gt 0 ]] || die "Ubuntu package resolution produced nothing"
   local python; python="$(python_dist "$termux_arch")"
+  if [[ -n "$JNILIBS_RESTORE_DIR" ]]; then
+    # Termux pool rotated past our pins; restore the four container .so files
+    # 1:1 from the official release APK instead (same bytes, verified below).
+    local r
+    for r in libproot.so libproot-loader.so libtalloc.so libandroid-shmem.so; do
+      [[ -s "$JNILIBS_RESTORE_DIR/$r" ]] || die "JNILIBS_RESTORE_DIR/$r missing"
+    done
+    # inputs_sha 仍需容器二进制指纹：用还原 so 的路径参与哈希
+    proot_deb="$JNILIBS_RESTORE_DIR/libproot.so"
+    talloc_deb="$JNILIBS_RESTORE_DIR/libtalloc.so"
+    shmem_deb="$JNILIBS_RESTORE_DIR/libandroid-shmem.so"
+    for r in libproot.so libproot-loader.so libtalloc.so libandroid-shmem.so; do
+      cp "$JNILIBS_RESTORE_DIR/$r" "$jni/$r"
+    done
+    chmod 0755 "$jni"/*.so
+    "${PY[@]}" elf-info "$jni"/*.so > "$work/jni-elf.json"
+    python3 - "$jni" "$work/jni-elf.json" "$work/jnilibs.json" "$PROOT_VERSION" "$TALLOC_VERSION" "$SHMEM_VERSION" <<'PYJ'
+import hashlib, json, os, sys
+jni, elf, out, proot_v, talloc_v, shmem_v = sys.argv[1:7]
+info = json.load(open(elf))
+res = {}
+for name in ("libproot.so", "libproot-loader.so", "libtalloc.so", "libandroid-shmem.so"):
+    path = os.path.join(jni, name)
+    e = info[path]
+    res[name] = {
+        "sha256": hashlib.sha256(open(path, "rb").read()).hexdigest(),
+        "bytes": os.path.getsize(path),
+        "source": "official-release-restore",
+        "patch": "DT_NEEDED libtalloc.so.2 -> libtalloc.so" if name in ("libproot.so", "libtalloc.so") else None,
+        "machine": e["machine"], "type": e["type"], "needed": e.get("needed"),
+        "soname": e.get("soname"), "minLoadAlign": e["minLoadAlign"],
+    }
+json.dump(res, open(out, "w"), indent=2)
+PYJ
+    log "jniLibs restored from official release (proot/talloc/shmem versions informational)"
+  else
   proot_deb="$(termux_deb proot "$PROOT_VERSION" "$termux_arch")"
   talloc_deb="$(termux_deb libtalloc "$TALLOC_VERSION" "$termux_arch")"
   shmem_deb="$(termux_deb libandroid-shmem "$SHMEM_VERSION" "$termux_arch")"
@@ -439,10 +475,15 @@ open(sys.argv[2], "wb").write(z.read(name))
 PYEOF
   cp "$debx/data/data/com.termux/files/usr/share/doc/libandroid-shmem/copyright" "$assets/licenses/libandroid-shmem-copyright.txt"
   sed -n '1,/\*\//p' "$tprefix/include/talloc.h" > "$assets/licenses/libtalloc-notice.txt"
+  fi
 
   # -- DSH --
   local prefix="$work/dsh-prefix"
-  install_dsh "$npm_cpu" "$prefix"
+  if [[ ! -f "$work/.dsh-installed" ]]; then
+    install_dsh "$npm_cpu" "$prefix" && touch "$work/.dsh-installed"
+  else
+    log "dsh prefix cached at $prefix"
+  fi
   log "patching DSH (runtime/patches, pinned for $DSH_VERSION)"
   "${PY[@]}" patch-dsh --prefix "$prefix" --dsh-version "$DSH_VERSION" --patches "$HERE/patches" \
     --out "$work/dsh-patches.json" >&2
@@ -450,7 +491,11 @@ PYEOF
   local bridge_version
   bridge_version="$(python3 -I -c 'import json,sys; print(json.load(open(sys.argv[1]))["version"])' "$bridge/package.json")"
   local pnpm_prefix="$work/pnpm-prefix"
-  install_pnpm "$npm_cpu" "$pnpm_prefix"
+  if [[ ! -f "$work/.pnpm-installed" ]]; then
+    install_pnpm "$npm_cpu" "$pnpm_prefix" && touch "$work/.pnpm-installed"
+  else
+    log "pnpm prefix cached at $pnpm_prefix"
+  fi
 
   # -- runtimeVersion: hash of every input + the recipe itself --
   local lockfile="$LOCKS/dsh-$DSH_VERSION/package-lock.json"
@@ -475,6 +520,12 @@ PYEOF
   if [[ "$RUNTIME_LAYERS" == 1 ]]; then
     archives=("$assets/base-$abi.tar.$COMPRESS" "$assets/engine-$abi.tar.$COMPRESS")
     archive_args=(--base-out "${archives[0]}" --engine-out "${archives[1]}" --base-cache "$BASE_LAYER_CACHE")
+  elif [[ "$RUNTIME_LAYERS" == 3 ]]; then
+    # Variant naming: base carries the distro, node its version, engine the DSH pin.
+    archives=("$assets/base-ubuntu-${UBUNTU_VERSION}-$abi.tar.$COMPRESS" \
+              "$assets/node-v${NODE_VERSION}-$abi.tar.$COMPRESS" \
+              "$assets/engine-dsh${DSH_VERSION}-$abi.tar.$COMPRESS")
+    archive_args=(--base-out "${archives[0]}" --node-out "${archives[1]}" --engine-out "${archives[2]}" --base-cache "$BASE_LAYER_CACHE")
   fi
   local -a prune=(); [[ "$PRUNE_DEV_METADATA" == 1 ]] && prune=(--prune-dev-metadata)
   log "assembling rootfs ($COMPRESS)"
@@ -488,8 +539,24 @@ PYEOF
     "$runtime_version" "$DSH_VERSION" "$NODE_VERSION" "$PNPM_VERSION" "$UBUNTU_VERSION" "$PROOT_VERSION" "$TALLOC_VERSION" "$SHMEM_VERSION" \
     "$(cat "$work/dsh-patches.json")" "$bridge_version" \
     "$inputs_sha" "$(sha256 "$base")" "$(sha256 "$node")" "$(sha256 "$lockfile")" "$PNPM_INTEGRITY" "$SOURCE_DATE_EPOCH")"
-  "${PY[@]}" manifest --abi "$abi" --report "$out/build-report.json" --jnilibs "$work/jnilibs.json" \
-    --versions "$versions" --out "$assets/manifest.json" >&2
+  if [[ "$RUNTIME_LAYERS" == 3 ]]; then
+    # Keep every variant's layer descriptors (append-only; later same-asset lines win
+    # when the layers index is aggregated), and a per-variant manifest for records.
+    mkdir -p "$OUT/variants"
+    "${PY[@]}" manifest --abi "$abi" --report "$out/build-report.json" --jnilibs "$work/jnilibs.json" \
+      --versions "$versions" --out "$OUT/variants/manifest-${UBUNTU_VERSION}-${NODE_VERSION}-${DSH_VERSION}-$abi.json" >&2
+    python3 - "$out/build-report.json" "$OUT/layers-$abi.jsonl" <<'PYV'
+import json, sys
+report = json.load(open(sys.argv[1]))
+rec = {"ubuntuVersion": report.get("ubuntuVersion"), "nodeVersion": report.get("nodeVersion"),
+       "layers": report["layers"]}
+with open(sys.argv[2], "a") as f:
+    f.write(json.dumps(rec, sort_keys=True) + "\n")
+PYV
+  else
+    "${PY[@]}" manifest --abi "$abi" --report "$out/build-report.json" --jnilibs "$work/jnilibs.json" \
+      --versions "$versions" --out "$assets/manifest.json" >&2
+  fi
 
   # -- verification: every jniLib and every ELF in the rootfs must match the ABI --
   local f bad=0
@@ -531,13 +598,67 @@ print("wrote " + os.path.join(out, "manifest.json"))
 PYEOF
 }
 
+write_layers_index() {  # $@ = abis; aggregates OUT/layers-<abi>.jsonl into OUT/layers-index.json
+  python3 - "$OUT" "layers-index.json" "$@" <<'PYI'
+import glob, json, os, sys
+out, name, abis = sys.argv[1], sys.argv[2], sys.argv[3:]
+layers = {"base": {}, "node": {}, "engine": {}}
+per_abi = {}
+for abi in abis:
+    path = os.path.join(out, "layers-%s.jsonl" % abi)
+    if not os.path.exists(path):
+        continue
+    for line in open(path):
+        rec = json.loads(line)
+        base = rec["layers"]["base"]; node = rec["layers"]["node"]; engine = rec["layers"]["engine"]
+        uv = (rec.get("ubuntuVersion") or "").replace("ubuntu-", "")
+        nv = (rec.get("nodeVersion") or "").replace("node-v", "")
+        if uv: layers["base"][uv] = dict(base, abi=abi)
+        if nv: layers["node"][nv] = dict(node, abi=abi)
+        stem = engine["asset"]
+        for suffix in ("-%s.tar.xz" % abi, "-%s.tar.gz" % abi):
+            stem = stem[:-len(suffix)] if stem.endswith(suffix) else stem
+        engine_key = stem.split("-dsh", 1)[1] if "-dsh" in stem else None
+        if engine_key: layers["engine"][engine_key] = dict(engine, abi=abi)
+    # carry what the app needs to build a RuntimeManifest per abi (launch argv/env,
+    # direct engine seams, dsh metadata); taken from the first variant manifest.
+    first = sorted(glob.glob(os.path.join(out, "variants", "manifest-*.json")))
+    first = [m for m in first if m.endswith("-%s.json" % abi)]
+    if first:
+        m = json.load(open(first[0]))
+        per_abi[abi] = {k: m[k] for k in ("launch", "directEngine", "dshPatches",
+                                          "dshGoBridge", "prootVersion", "pnpmVersion",
+                                          "dshVersion", "tallocVersion", "androidShmemVersion")
+                        if k in m}
+index = {"schema": 3, "generatedBy": "build-runtime.sh RUNTIME_LAYERS=3",
+         "layers": layers, "abis": per_abi,
+         "notes": "layers.* keys: base=ubuntu version, node=node version, engine=dsh version; "
+                  "archives unpack in order base -> node -> engine (later entries win)"}
+dest = os.path.join(out, name)
+json.dump(index, open(dest, "w"), indent=2, sort_keys=True)
+print("wrote " + dest)
+PYI
+}
+
 main() {
   local -a abis=("$@")
   [[ ${#abis[@]} -gt 0 ]] || abis=(x86_64 arm64-v8a)
   mkdir -p "$CACHE" "$WORK" "$OUT"
   local abi
+  if [[ "$RUNTIME_LAYERS" == 3 && -n "$RUNTIME_VARIANTS" ]]; then
+    # RUNTIME_VARIANTS: space-separated ubuntu:node pairs, e.g. "24.04.5:24.22.1 24.04.5:24.9.0"
+    local pair
+    for pair in $RUNTIME_VARIANTS; do
+      UBUNTU_VERSION="${pair%%:*}"; NODE_VERSION="${pair##*:}"
+      log "variant ubuntu=$UBUNTU_VERSION node=$NODE_VERSION dsh=$DSH_VERSION"
+      for abi in "${abis[@]}"; do build_abi "$abi"; done
+    done
+    write_layers_index "${abis[@]}"
+    return
+  fi
   for abi in "${abis[@]}"; do build_abi "$abi"; done
   write_index
 }
 
-main "$@"
+# build-layers.sh sources this file for its functions; run-as-script guard.
+[[ "${BASH_SOURCE[0]}" != "${0}" ]] || main "$@"

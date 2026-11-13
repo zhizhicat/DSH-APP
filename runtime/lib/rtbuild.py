@@ -6,6 +6,7 @@ Runs with `python3 -I` on the build host (any arch). Never executes anything fro
 inputs it reads; downloaded archives are treated as data.
 """
 import argparse
+import re
 import gzip
 import hashlib
 import io
@@ -36,10 +37,13 @@ DIRECT_SRC = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "dir
 PNPM_BINS = {"pnpm": "pnpm.mjs", "pnpx": "pnpx.mjs", "pn": "pnpm.mjs", "pnx": "pnpx.mjs"}
 # Only these app-owned paths may change during an engine upgrade. Python (including
 # pip packages), dpkg, /usr and the rest of /usr/local remain the user's system.
+# Layer split for variant channels (schema 3): node gets its own layer so
+# (base x node x engine) combinations need only base + node + engine packages.
+NODE_PATHS = ["opt/node"] + ["usr/local/bin/" + name for name in ("node", "npm", "npx", "corepack")]
 ENGINE_PATHS = [
-    "opt/dsh", "opt/node", "opt/dsh-go", "etc/dsh-app",
+    "opt/dsh", "opt/dsh-go", "etc/dsh-app",
     "etc/profile.d/dsh-app.sh", "usr/local/lib/node_modules/pnpm",
-] + ["usr/local/bin/" + name for name in ("dsh", "node", "npm", "npx", "corepack", *PNPM_BINS)]
+] + ["usr/local/bin/" + name for name in ("dsh", *PNPM_BINS)]
 
 
 def upgrade_descriptor(abi, ubuntu_version, base_sha, deb_shas, python_sha):
@@ -1048,18 +1052,34 @@ def write_archive(entries, out, args, *, layered=False):
 
 
 def partition_entries(entries):
-    """Split the final normalized tree; shared ancestors are identical dirs."""
-    def owned(path):
-        return any(path == root or path.startswith(root + "/") for root in ENGINE_PATHS)
+    """Split the final normalized tree into base / node / engine layers.
 
-    base = {p: e for p, e in entries.items() if not owned(p)}
-    engine = {p: e for p, e in entries.items() if owned(p)}
-    for path in list(engine):
-        parent = posixpath.dirname(path)
-        while parent:
-            engine[parent] = entries[parent]
-            parent = posixpath.dirname(parent)
-    return base, engine
+    Node is separated from engine only when the caller passes --node-out
+    (three-layer variant mode); with plain base+engine outputs the node files
+    stay in the engine layer, matching the legacy schema-2 behavior.
+    Shared ancestors are identical dirs replicated into every owning layer.
+    """
+    def owned_by(roots, path):
+        return any(path == root or path.startswith(root + "/") for root in roots)
+
+    split_node = partition_entries.split_node
+    engine_paths = ENGINE_PATHS if not split_node else ENGINE_PATHS
+    base, node_layer, engine = {}, {}, {}
+    for p, e in entries.items():
+        if owned_by(engine_paths, p):
+            engine[p] = e
+        elif split_node and owned_by(NODE_PATHS, p):
+            node_layer[p] = e
+        else:
+            base[p] = e
+    for tree in ([node_layer] if split_node else []) + [engine]:
+        for path in list(tree):
+            parent = posixpath.dirname(path)
+            while parent:
+                tree[parent] = entries[parent]
+                parent = posixpath.dirname(parent)
+    return base, node_layer, engine
+partition_entries.split_node = False
 
 
 def archive_file(entries, path):
@@ -1222,14 +1242,19 @@ def layer_descriptor(stats):
 def cmd_assemble(args):
     abi = args.abi
     layered = args.base_out is not None or args.engine_out is not None
-    if layered:
-        if args.out or not (args.base_out and args.engine_out and args.base_cache):
+    three_layer = layered and args.node_out is not None
+    if three_layer:
+        if args.out or not (args.base_out and args.engine_out and args.node_out and args.base_cache):
+            raise SystemExit("use --base-out, --node-out, --engine-out and --base-cache together, without --out")
+        partition_entries.split_node = True
+    elif layered:
+        if args.out or args.node_out or not (args.base_out and args.engine_out and args.base_cache):
             raise SystemExit("use --base-out, --engine-out and --base-cache together, without --out")
         for kind, out in (("base", args.base_out), ("engine", args.engine_out)):
             expected = "%s-%s.tar.%s" % (kind, abi, args.compress)
             if os.path.basename(out) != expected:
                 raise SystemExit("layer output must use basename " + expected)
-    elif not args.out or args.base_cache:
+    elif not args.out or args.base_cache or args.node_out:
         raise SystemExit("use --out for a single archive, or the paired layer outputs with --base-cache")
     machine = ABI[abi]["machine"]
     entries = {}
@@ -1542,9 +1567,32 @@ def cmd_assemble(args):
         elif e.kind == "file":
             e.mode = (e.mode & 0o777) | 0o600
 
-    # 7. The same normalized tree feeds either the legacy archive or both layers.
-    if layered:
-        base, engine = partition_entries(entries)
+    # 7. The same normalized tree feeds the legacy archive or the layer split.
+    if three_layer:
+        base, node_layer, engine = partition_entries(entries)
+        compatibility = base_compatibility(base, with_python=bool(args.python))
+        runtime_info["baseCompatibility"] = compatibility
+        # engine runtime.json must not embed combo-specific fields (ubuntu/node
+        # versions), so the engine archive stays identical across combos.
+        engine_info = {k: v for k, v in runtime_info.items()
+                       if k not in ("ubuntuVersion", "nodeVersion", "baseCompatibility")}
+        engine_info["layerSchema"] = 3
+        entries["etc/dsh-app/runtime.json"].data = (json.dumps(engine_info, indent=2, sort_keys=True) + "\n").encode()
+        base_stats, cache = write_base_archive(base, args.base_out, args, sources)
+        node_stats = write_archive(node_layer, args.node_out, args, layered=True)
+        engine_stats = write_archive(engine, args.engine_out, args, layered=True)
+        report.update(entry_statistics(entries))
+        report.update(threeLayer=True,
+                      layers={"base": layer_descriptor(base_stats),
+                              "node": layer_descriptor(node_stats),
+                              "engine": layer_descriptor(engine_stats)},
+                      baseCompatibility=compatibility, baseCache=cache,
+                      ubuntuVersion=runtime_info.get("ubuntuVersion"),
+                      nodeVersion=runtime_info.get("nodeVersion"),
+                      archiveBytes=base_stats["archiveBytes"] + node_stats["archiveBytes"] + engine_stats["archiveBytes"],
+                      tarBytes=base_stats["tarBytes"] + node_stats["tarBytes"] + engine_stats["tarBytes"])
+    elif layered:
+        base, _node_unused, engine = partition_entries(entries)
         compatibility = base_compatibility(base, with_python=bool(args.python))
         runtime_info["baseCompatibility"] = compatibility
         entries["etc/dsh-app/runtime.json"].data = (json.dumps(runtime_info, indent=2, sort_keys=True) + "\n").encode()
@@ -1670,12 +1718,18 @@ def cmd_manifest(args):
     jni = json.load(open(args.jnilibs))
     v = json.loads(args.versions)
     layered = "layers" in report
-    if layered:
+    three_layer = report.get("threeLayer") is True
+    if layered and not three_layer:
         if set(report["layers"]) != {"base", "engine"} or "archive" in report or "archiveSha256" in report:
             raise SystemExit("layer report must contain only base and engine, without a single archive")
+    if three_layer:
+        if set(report["layers"]) != {"base", "node", "engine"} or "archive" in report:
+            raise SystemExit("three-layer report must contain base, node and engine")
+        # Variant layer names carry the version: base-ubuntu-24.04.5-<abi>.tar.xz,
+        # node-v24.22.1-<abi>.tar.xz, engine-dsh0.2.2-rc.1-<abi>.tar.xz.
+        pattern = re.compile(r"^(base|node|engine)-.+-%s\.tar\.(xz|gz)$" % re.escape(args.abi))
         for kind, layer in report["layers"].items():
-            names = {"%s-%s.tar.%s" % (kind, args.abi, suffix) for suffix in ("xz", "gz")}
-            if layer["asset"] not in names:
+            if not pattern.match(layer["asset"]) or not layer["asset"].startswith(kind + "-"):
                 raise SystemExit("invalid %s asset name for ABI %s" % (kind, args.abi))
     m = {
         "schema": 2 if layered else 1,
@@ -1785,6 +1839,7 @@ def main():
     p.add_argument("--out", help="legacy single rootfs archive")
     p.add_argument("--base-out", help="base-<abi>.tar.xz or .tar.gz; paired with --engine-out")
     p.add_argument("--engine-out", help="engine-<abi>.tar.xz or .tar.gz; paired with --base-out")
+    p.add_argument("--node-out", help="node-<abi>.tar.xz or .tar.gz; adds the middle node layer (schema 3)")
     p.add_argument("--base-cache", help="explicit directory for validated base archive reuse")
     p.add_argument("--report", required=True)
     p.add_argument("--runtime-info", required=True)
