@@ -34,6 +34,14 @@ jobs:
         with:
           persist-credentials: false
 
+      # dl.google.com 对 runner 时快时慢（NDK 2GB 全量下载曾卡 90 分钟超时），
+      # 缓存整个 $HOME/dev 工具链（setup-toolchain.sh 幂等跳过已装部分）。
+      - name: Toolchain cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/dev
+          key: apk-toolchain-v1-${{ hashFiles('tooling/setup-toolchain.sh') }}
+
       - name: Install toolchain (JDK 17 / Android SDK+NDK; Flutter via flutter-action)
         run: bash tooling/setup-toolchain.sh
 
