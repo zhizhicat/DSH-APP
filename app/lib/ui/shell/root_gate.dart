@@ -164,22 +164,29 @@ class _RootGateState extends ConsumerState<RootGate> {
     unawaited(EngineControl.ensureStarted(_container));
   }
 
+  /// Whether a variant (schema 3) channel exists: probed once at gate mount,
+  /// so 「本机」 stays synchronous (probe misses default to the flat channel).
+  bool? _variantAvailable;
+
+  Future<void> _probeVariant() async {
+    if (_variantAvailable != null) return;
+    try {
+      final channels = await ref.read(localRuntimeProvider.notifier).channels();
+      _variantAvailable = channels.any((c) => c.id.contains('layers'));
+    } catch (_) {
+      _variantAvailable = false;
+    }
+  }
+
   /// 「本机」: unpack in the background, set up meanwhile. A noruntime build
   /// with variant channels first asks which mirror and versions to pull.
   void _chooseLocal() {
     _beside = true;
     unawaited(_prefs.setSetupStep(SetupStep.appearance));
-    unawaited(_maybeChooseSource());
-  }
-
-  Future<void> _maybeChooseSource() async {
-    try {
-      final channels = await ref.read(localRuntimeProvider.notifier).channels();
-      if (channels.any((c) => c.id.contains('layers'))) {
-        _goTo(OnboardingStep.downloadSource);
-        return;
-      }
-    } catch (_) {/* fall through to the flat channel */}
+    if (_variantAvailable == true) {
+      _goTo(OnboardingStep.downloadSource);
+      return;
+    }
     _startUnpack();
     _goTo(OnboardingStep.appearance);
   }
@@ -300,6 +307,7 @@ class _RootGateState extends ConsumerState<RootGate> {
 
   @override
   Widget build(BuildContext context) {
+    unawaited(_probeVariant());
     final settings = ref.watch(settingsProvider);
     final runtime = ref.watch(localRuntimeProvider.select((s) => (status: s.status, loaded: s.loaded)));
     final prefs = ref.watch(onboardingPrefsProvider);
