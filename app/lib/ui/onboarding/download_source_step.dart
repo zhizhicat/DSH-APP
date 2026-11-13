@@ -261,10 +261,9 @@ class _SourceRow extends StatelessWidget {
       dense: true,
       title: Text(source.name),
       trailing: trailing,
-      leading: Radio<String>(
-        value: source.id,
-        groupValue: selectedId,
-        onChanged: (_) => onTap(),
+      leading: Icon(
+        selectedId == source.id ? Icons.radio_button_checked : Icons.radio_button_off,
+        size: 20,
       ),
       onTap: onTap,
     );
