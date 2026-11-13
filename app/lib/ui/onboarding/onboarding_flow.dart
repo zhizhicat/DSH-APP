@@ -37,6 +37,7 @@ class OnboardingFlow extends StatefulWidget {
     this.onRemote,
     this.onLocal,
     this.onSourceDone,
+    this.onSourceDefault,
     this.onAppearanceDone,
     this.onAccessDone,
     this.onFinished,
