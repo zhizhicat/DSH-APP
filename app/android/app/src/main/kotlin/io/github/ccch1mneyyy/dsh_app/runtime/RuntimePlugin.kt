@@ -145,7 +145,7 @@ class RuntimePlugin :
                         val downloads = File(appContext.cacheDir, "runtime-downloads")
                         downloads.mkdirs()
                         val index = LayerChannels.fetchIndex(channel, source, downloads,
-                            RuntimeDownloader(onLog = {}, isCancelled = { false }))
+                            RuntimeDownloader(appContext, onLog = {}, isCancelled = { false }))
                         result.success(index.toString())
                     } catch (e: Exception) {
                         result.error("index_failed", e.message, null)

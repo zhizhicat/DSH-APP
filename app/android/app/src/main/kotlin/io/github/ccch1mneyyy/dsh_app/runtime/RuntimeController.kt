@@ -312,7 +312,7 @@ class RuntimeController private constructor(private val app: Context) : DshProce
                     ?: throw IOException("unknown runtime channel: $channelId")
                 val downloads = File(app.cacheDir, "runtime-downloads")
                 downloads.mkdirs()
-                val downloader = RuntimeDownloader(::note) { isCancelledDownloads() }
+                val downloader = RuntimeDownloader(app, ::note) { isCancelledDownloads() }
                 log("[dsh-app] channel ${channel.id}: fetching manifest", "system")
                 val manifestFile = downloader.download(
                     channel.manifestUrl, File(downloads, "manifest.json"), channel.manifestSha256,
@@ -381,7 +381,7 @@ class RuntimeController private constructor(private val app: Context) : DshProce
                     ?: ChannelRegistry.Source(sourceId, sourceId, "")
                 val downloads = File(app.cacheDir, "runtime-downloads")
                 downloads.mkdirs()
-                val downloader = RuntimeDownloader(::note) { isCancelledDownloads() }
+                val downloader = RuntimeDownloader(app, ::note) { isCancelledDownloads() }
                 log("[dsh-app] channel ${channel.id} via ${source.id}: fetching layers index", "system")
                 val index = LayerChannels.fetchIndex(channel, source, downloads, downloader)
                 val m = RuntimeManifest.fromJson(

@@ -1,21 +1,21 @@
 package io.github.ccch1mneyyy.dsh_app.runtime
 
+import android.app.DownloadManager
+import android.content.Context
+import android.net.Uri
 import java.io.File
 import java.io.IOException
-import java.io.InputStream
-import java.net.HttpURLConnection
-import java.net.URL
-import java.security.DigestInputStream
 import java.security.MessageDigest
 import java.util.concurrent.CancellationException
 
 /**
- * Streams one runtime archive over HTTPS into the app-private download
- * directory, verifying the sha256 (when known) and the byte count (when known)
- * before the file is revealed under its final name. Retries are whole-file
- * (no range resume); each attempt writes a fresh ".part" file.
+ * Downloads one runtime artifact through the system DownloadManager (its own
+ * network stack, sandboxed away from the app process), verifying the sha256
+ * (when known) and the byte count (when known) before the file is revealed
+ * under its final name. Retries are whole-file (no range resume).
  */
 internal class RuntimeDownloader(
+    private val app: Context,
     private val onLog: (String) -> Unit,
     private val isCancelled: () -> Boolean = { false },
 ) {
@@ -65,50 +65,71 @@ internal class RuntimeDownloader(
         expectedBytes: Long,
         onProgress: (Long, Long) -> Unit,
     ): String {
-        val connection = URL(url).openConnection() as HttpURLConnection
-        connection.connectTimeout = CONNECT_TIMEOUT_MS
-        connection.readTimeout = READ_TIMEOUT_MS
-        connection.instanceFollowRedirects = true
+        val dm = app.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+        val request = DownloadManager.Request(Uri.parse(url)).apply {
+            setTitle(part.name.removeSuffix(".part"))
+            setNotificationVisibility(DownloadManager.Request.VISIBILITY_HIDDEN)
+            setDestinationInExternalFilesDir(app, null, part.name)
+            setAllowedOverMetered(true)
+            setAllowedOverRoaming(true)
+        }
+        val id = dm.enqueue(request)
+        val query = DownloadManager.Query().setFilterById(id)
+        val deadline = System.currentTimeMillis() + DOWNLOAD_TIMEOUT_MS
         try {
-            connection.setRequestProperty("Accept", "*/*")
-            // Cloudflare-fronted mirrors challenge the default Dalvik UA on
-            // full GETs while 1-byte Range probes pass through.
-            connection.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126 Mobile Safari/537.36")
-            val code = connection.responseCode
-            if (code !in 200..299) throw IOException("HTTP $code for $url")
-            val total = connection.contentLengthLong.takeIf { it > 0 }
-                ?: expectedBytes.takeIf { it > 0 }
-                ?: -1L
-            val digest = MessageDigest.getInstance("SHA-256")
-            var read = 0L
-            var lastReported = 0L
-            connection.inputStream.let { raw: InputStream ->
-                DigestInputStream(raw, digest).use { input ->
-                    val buffer = ByteArray(BUFFER_BYTES)
-                    while (true) {
-                        if (isCancelled()) throw CancellationException("download cancelled")
-                        val n = input.read(buffer)
-                        if (n < 0) break
-                        read += n
-                        if (read - lastReported >= REPORT_INTERVAL_BYTES) {
-                            lastReported = read
-                            onProgress(read, total)
+            while (true) {
+                if (isCancelled()) throw CancellationException("download cancelled")
+                if (System.currentTimeMillis() > deadline) {
+                    throw IOException("download timed out after ${DOWNLOAD_TIMEOUT_MS / 1000}s: $url")
+                }
+                var finished = false
+                dm.query(query)?.use { c ->
+                    if (!c.moveToFirst()) throw IOException("download entry vanished: $url")
+                    when (c.getInt(c.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS))) {
+                        DownloadManager.STATUS_SUCCESSFUL -> finished = true
+                        DownloadManager.STATUS_FAILED -> {
+                            val reason = c.getInt(c.getColumnIndexOrThrow(DownloadManager.COLUMN_REASON))
+                            throw IOException("download manager failed (reason code $reason): $url")
+                        }
+                        else -> {
+                            val soFar = c.getLong(c.getColumnIndexOrThrow(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR))
+                            onProgress(soFar, if (expectedBytes > 0) expectedBytes else soFar)
                         }
                     }
+                } ?: throw IOException("download manager unavailable")
+                if (finished) break
+                Thread.sleep(500)
+            }
+            val localUri = dm.query(query)?.use { c ->
+                if (c.moveToFirst()) c.getString(c.getColumnIndexOrThrow(DownloadManager.COLUMN_LOCAL_URI)) else null
+            } ?: throw IOException("downloaded file location unknown: $url")
+            val staged = File(Uri.parse(localUri).path!!)
+            part.parentFile?.mkdirs()
+            try {
+                if (!staged.renameTo(part)) staged.copyTo(part, overwrite = true)
+            } finally {
+                staged.delete()
+            }
+            val digest = MessageDigest.getInstance("SHA-256")
+            part.inputStream().use { input ->
+                val buffer = ByteArray(BUFFER_BYTES)
+                while (true) {
+                    val n = input.read(buffer)
+                    if (n < 0) break
+                    digest.update(buffer, 0, n)
                 }
             }
-            onProgress(read, if (total > 0) total else read)
+            dm.remove(id)
             return digest.digest().joinToString("") { "%02x".format(it) }
-        } finally {
-            connection.disconnect()
+        } catch (e: Exception) {
+            dm.remove(id)
+            throw e
         }
     }
 
     private companion object {
         const val MAX_ATTEMPTS = 3
-        const val CONNECT_TIMEOUT_MS = 15_000
-        const val READ_TIMEOUT_MS = 60_000
+        const val DOWNLOAD_TIMEOUT_MS = 30 * 60 * 1000L
         const val BUFFER_BYTES = 1 shl 16
-        const val REPORT_INTERVAL_BYTES = 512L * 1024
     }
 }
