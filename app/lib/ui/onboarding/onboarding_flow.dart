@@ -64,6 +64,9 @@ class OnboardingFlow extends StatefulWidget {
   /// page was not offered.
   final void Function(String sourceId, LayersChoice choice)? onSourceDone;
 
+  /// 「用默认通道下载」 on the source page: no mirror served the index.
+  final VoidCallback? onSourceDefault;
+
   final VoidCallback? onAppearanceDone;
 
   /// Past 想让 DSH Go 帮你做哪些事 (picked and walked, or skipped).
@@ -95,6 +98,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
       OnboardingStep.welcome => WelcomePage(onStart: widget.onWelcomeDone),
       OnboardingStep.downloadSource => DownloadSourceStepPage(
         onDone: widget.onSourceDone ?? (sourceId, choice) => widget.onRuntimeDone(),
+        onDefault: widget.onSourceDefault,
       ),
       OnboardingStep.runtime => RuntimeSetupPage(
         onDone: widget.onRuntimeDone,

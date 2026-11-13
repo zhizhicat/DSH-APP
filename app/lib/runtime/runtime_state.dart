@@ -118,13 +118,13 @@ class LocalRuntimeController extends Notifier<LocalRuntimeState> {
       _bridge.probeChannelSource(channelId, sourceId);
 
   /// Fetches and parses the layers index for [channelId] through [sourceId].
+  /// Throws the native error message when the fetch fails (the source page
+  /// surfaces it; [LayersIndex.parse] null means an unparsable body).
   Future<LayersIndex?> layersIndex(String channelId, String sourceId) async {
-    try {
-      final raw = await _bridge.layerChannelIndex(channelId, sourceId);
-      return LayersIndex.parse(raw);
-    } catch (_) {
-      return null;
-    }
+    final raw = await _bridge.layerChannelIndex(channelId, sourceId);
+    final index = LayersIndex.parse(raw);
+    if (index == null) throw StateError('layers index unparsable');
+    return index;
   }
 
   Future<void> installLayerChannel({

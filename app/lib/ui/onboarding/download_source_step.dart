@@ -25,10 +25,14 @@ class _ProbeState {
 }
 
 class DownloadSourceStepPage extends ConsumerStatefulWidget {
-  const DownloadSourceStepPage({super.key, required this.onDone});
+  const DownloadSourceStepPage({super.key, required this.onDone, this.onDefault});
 
   /// Called with the chosen source id + layers choice when 开始下载 is tapped.
   final void Function(String sourceId, LayersChoice choice) onDone;
+
+  /// 「用默认通道下载」 when no mirror can serve the index: the caller starts
+  /// the flat-channel unpack instead. Null hides the escape hatch.
+  final VoidCallback? onDefault;
 
   @override
   ConsumerState<DownloadSourceStepPage> createState() => _DownloadSourceStepPageState();
@@ -103,15 +107,22 @@ class _DownloadSourceStepPageState extends ConsumerState<DownloadSourceStepPage>
       if (mounted) setState(() { _indexLoading = false; _indexError = context.l10n.setupSourceIndexFailed; });
       return;
     }
-    final index = await ref.read(localRuntimeProvider.notifier).layersIndex(channelId, sourceId);
+    Object? indexError;
+    LayersIndex? index;
+    try {
+      index = await ref.read(localRuntimeProvider.notifier).layersIndex(channelId, sourceId);
+    } catch (e) {
+      indexError = e;
+    }
     if (!mounted) return;
     setState(() {
       _indexLoading = false;
       _index = index;
       if (index == null) {
-        _indexError = context.l10n.setupSourceIndexFailed;
+        _indexError = '${context.l10n.setupSourceIndexFailed}\n$indexError';
         _choice = null;
       } else {
+        _indexError = null;
         _choice = _validChoice(preferred, index) ??
             LayersChoice(base: index.base.first.key, node: index.node.first.key, engine: index.engine.first.key);
       }
@@ -166,11 +177,18 @@ class _DownloadSourceStepPageState extends ConsumerState<DownloadSourceStepPage>
             padding: EdgeInsets.symmetric(vertical: 24),
             child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
           )
-        else if (_indexError != null)
+        else if (_indexError != null) ...[
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 16),
             child: Text(_indexError!, style: Theme.of(context).textTheme.bodySmall),
-          )
+          ),
+          if (widget.onDefault != null)
+            OutlinedButton(
+              onPressed: widget.onDefault,
+              style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+              child: Text(l10n.setupSourceUseDefault),
+            ),
+        ]
         else if (_index != null && _choice != null) ...[
           SettingsSection(
             key: const ValueKey('setup-variants-card'),

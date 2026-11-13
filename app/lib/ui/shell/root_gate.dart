@@ -182,12 +182,22 @@ class _RootGateState extends ConsumerState<RootGate> {
   /// with variant channels first asks which mirror and versions to pull.
   void _chooseLocal() {
     _beside = true;
-    unawaited(_prefs.setSetupStep(SetupStep.appearance));
+    // No setupStep yet: a kill while the source page shows resumes to the
+    // runtime choice (「本机」 again), not past it; _afterSource/_skipSource
+    // persist appearance.
     if (_variantAvailable == true) {
       _goTo(OnboardingStep.downloadSource);
       return;
     }
     _startUnpack();
+    unawaited(_prefs.setSetupStep(SetupStep.appearance));
+    _goTo(OnboardingStep.appearance);
+  }
+
+  /// 「用默认通道下载」: no mirror served the index; flat channel instead.
+  void _skipSource() {
+    _startUnpack();
+    unawaited(_prefs.setSetupStep(SetupStep.appearance));
     _goTo(OnboardingStep.appearance);
   }
 
@@ -376,6 +386,7 @@ class _RootGateState extends ConsumerState<RootGate> {
           beside: _beside,
           onLocal: _chooseRuntime ? _chooseLocal : null,
           onSourceDone: _afterSource,
+          onSourceDefault: _skipSource,
           onAppearanceDone: _afterAppearance,
           onAccessDone: _afterAccess,
           onFinished: _afterFinishing,
