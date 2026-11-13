@@ -372,7 +372,11 @@ build_abi() {
   local work="$WORK/$abi" out="$OUT/$abi"
   local assets="$out/assets/runtime" jni="$out/jniLibs/$abi"
   mkdir -p "$work"
-  rm -rf "$out"; mkdir -p "$assets/licenses" "$jni"
+  # Variant loops keep earlier variants' packages: layer filenames already
+  # differ per variant, and the engine archive is byte-identical across
+  # combinations of the same DSH version.
+  if [[ "$RUNTIME_LAYERS" != 3 ]]; then rm -rf "$out"; fi
+  mkdir -p "$assets/licenses" "$jni"
 
   local base node proot_deb talloc_deb shmem_deb proot_src
   base="$(ubuntu_base "$ubuntu_arch")"
