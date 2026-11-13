@@ -25,7 +25,7 @@
       "githubBase": "https://github.com/zhizhicat/DSH-APP/releases/download/runtime-layers/",
       "index": {
         "path": "layers-index.json",
-        "sha256": ""
+        "sha256": "f3a5d342dbee57d3f09c6eb465d4f04ed3c46d93e868bee0e7f22ae47b6d5164"
       }
     },
     {
