@@ -30284,23 +30284,23 @@ abstract class L10n {
   /// **'开始下载'**
   String get setupSourceStart;
 
-  /// No description provided for @setupVariantBase.
+  /// No description provided for @setupSourceRootfs.
   ///
   /// In zh, this message translates to:
   /// **'系统底座'**
-  String get setupVariantBase;
+  String get setupSourceRootfs;
 
-  /// No description provided for @setupVariantNode.
+  /// No description provided for @setupSourceNode.
   ///
   /// In zh, this message translates to:
   /// **'Node.js'**
-  String get setupVariantNode;
+  String get setupSourceNode;
 
-  /// No description provided for @setupVariantEngine.
+  /// No description provided for @setupSourceDsh.
   ///
   /// In zh, this message translates to:
   /// **'DSH'**
-  String get setupVariantEngine;
+  String get setupSourceDsh;
 
   /// No description provided for @shellApiKeyPrefixWarning.
   ///

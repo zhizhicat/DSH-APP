@@ -17427,13 +17427,13 @@ class L10nEn extends L10n {
   String get setupSourceStart => 'Start download';
 
   @override
-  String get setupVariantBase => 'Base system';
+  String get setupSourceRootfs => 'Base system';
 
   @override
-  String get setupVariantNode => 'Node.js';
+  String get setupSourceNode => 'Node.js';
 
   @override
-  String get setupVariantEngine => 'DSH';
+  String get setupSourceDsh => 'DSH';
 
   @override
   String get shellApiKeyPrefixWarning => 'DeepSeek keys usually start with sk-. Check you copied the right key.';

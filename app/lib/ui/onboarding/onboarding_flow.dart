@@ -93,7 +93,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
     final Widget page = switch (step) {
       OnboardingStep.welcome => WelcomePage(onStart: widget.onWelcomeDone),
       OnboardingStep.downloadSource => DownloadSourceStepPage(
-        onDone: widget.onSourceDone ?? (_, _) => widget.onRuntimeDone(),
+        onDone: widget.onSourceDone ?? (sourceId, choice) => widget.onRuntimeDone(),
       ),
       OnboardingStep.runtime => RuntimeSetupPage(
         onDone: widget.onRuntimeDone,

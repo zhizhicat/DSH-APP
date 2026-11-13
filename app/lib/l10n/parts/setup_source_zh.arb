@@ -10,9 +10,6 @@
   "setupSourceUseDefault": "用默认通道下载",
   "setupSourceTotalBytes": "共需下载约 {mb} MB",
   "setupSourceStart": "开始下载",
-  "setupVariantBase": "系统底座",
-  "setupVariantNode": "Node.js",
-  "setupVariantEngine": "DSH",
   "@setupSourceMs": {
     "placeholders": {
       "ms": {
@@ -26,5 +23,8 @@
         "type": "int"
       }
     }
-  }
+  },
+  "setupSourceRootfs": "系统底座",
+  "setupSourceNode": "Node.js",
+  "setupSourceDsh": "DSH"
 }

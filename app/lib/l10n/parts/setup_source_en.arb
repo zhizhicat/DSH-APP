@@ -10,9 +10,6 @@
   "setupSourceUseDefault": "Use the default channel",
   "setupSourceTotalBytes": "About {mb} MB to download",
   "setupSourceStart": "Start download",
-  "setupVariantBase": "Base system",
-  "setupVariantNode": "Node.js",
-  "setupVariantEngine": "DSH",
   "@setupSourceMs": {
     "placeholders": {
       "ms": {
@@ -26,5 +23,8 @@
         "type": "int"
       }
     }
-  }
+  },
+  "setupSourceRootfs": "Base system",
+  "setupSourceNode": "Node.js",
+  "setupSourceDsh": "DSH"
 }

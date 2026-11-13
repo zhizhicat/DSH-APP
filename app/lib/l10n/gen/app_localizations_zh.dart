@@ -16544,13 +16544,13 @@ class L10nZh extends L10n {
   String get setupSourceStart => '开始下载';
 
   @override
-  String get setupVariantBase => '系统底座';
+  String get setupSourceRootfs => '系统底座';
 
   @override
-  String get setupVariantNode => 'Node.js';
+  String get setupSourceNode => 'Node.js';
 
   @override
-  String get setupVariantEngine => 'DSH';
+  String get setupSourceDsh => 'DSH';
 
   @override
   String get shellApiKeyPrefixWarning => 'DeepSeek 的 Key 通常以 sk- 开头，确认没有复制错';
