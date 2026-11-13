@@ -64,9 +64,7 @@ install_cmdline_tools() {
   if [ -x "$SDK_DIR/cmdline-tools/latest/bin/sdkmanager" ]; then log "cmdline-tools present"; return; fi
   local name="commandlinetools-linux-${CMDLINE_TOOLS_BUILD}_latest.zip"
   log "cmdline-tools: $name"
-  # dl.google.com 对 runner 时慢时快；腾讯 AndroidSDK 镜像同文件优先，失败回落官方。
-  download_cached "$DL/$name" "https://mirrors.cloud.tencent.com/AndroidSDK/$name" ||
-    rm -f "$DL/$name" && download_cached "$DL/$name" "https://dl.google.com/android/repository/$name"
+  download_cached "$DL/$name" "https://dl.google.com/android/repository/$name"
   rm -rf "$DL/cmdline-tools" && mkdir -p "$SDK_DIR/cmdline-tools"
   (cd "$DL" && unzip -q -o "$name")
   rm -rf "$SDK_DIR/cmdline-tools/latest"
