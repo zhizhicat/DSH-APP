@@ -47,8 +47,9 @@ internal object LayerChannels {
         try {
             downloader.download(url, file, channel.indexSha256)
         } catch (e: IOException) {
+            val cause = e.cause?.let { "${it::class.simpleName}: ${it.message}" } ?: ""
             throw IOException(
-                "index fetch failed: sourceId='${source.id}' prefix='${source.prefix}' url=$url: ${e.message}", e,
+                "index fetch failed: sourceId='${source.id}' prefix='${source.prefix}' url=$url: ${e.message} $cause", e,
             )
         }
         return JSONObject(file.readText())

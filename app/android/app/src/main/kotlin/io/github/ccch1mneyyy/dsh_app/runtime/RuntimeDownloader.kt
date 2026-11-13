@@ -55,7 +55,8 @@ internal class RuntimeDownloader(
                 part.delete()
             }
         }
-        throw IOException("download failed after $MAX_ATTEMPTS attempts: $url", lastError)
+        val cause = lastError?.let { "${it::class.simpleName}: ${it.message}" } ?: "(no cause captured)"
+        throw IOException("download failed after $MAX_ATTEMPTS attempts: $url — $cause", lastError)
     }
 
     private fun downloadOnce(
@@ -70,6 +71,9 @@ internal class RuntimeDownloader(
         connection.instanceFollowRedirects = true
         try {
             connection.setRequestProperty("Accept", "*/*")
+            // Cloudflare-fronted mirrors challenge the default Dalvik UA on
+            // full GETs while 1-byte Range probes pass through.
+            connection.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126 Mobile Safari/537.36")
             val code = connection.responseCode
             if (code !in 200..299) throw IOException("HTTP $code for $url")
             val total = connection.contentLengthLong.takeIf { it > 0 }
