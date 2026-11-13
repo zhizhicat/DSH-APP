@@ -1,0 +1,30 @@
+{
+  "setupSourceTitle": "Download source & versions",
+  "setupSourceMessage": "Pick a mirror, then the base, Node and DSH to pull",
+  "setupSourceSection": "Download source",
+  "setupSourceVersions": "Runtime versions",
+  "setupSourceProbing": "Probing…",
+  "setupSourceUnreachable": "Unreachable",
+  "setupSourceMs": "{ms} ms",
+  "setupSourceIndexFailed": "Could not fetch the version list. Try another mirror, or use the default channel.",
+  "setupSourceUseDefault": "Use the default channel",
+  "setupSourceTotalBytes": "About {mb} MB to download",
+  "setupSourceStart": "Start download",
+  "setupVariantBase": "Base system",
+  "setupVariantNode": "Node.js",
+  "setupVariantEngine": "DSH",
+  "@setupSourceMs": {
+    "placeholders": {
+      "ms": {
+        "type": "int"
+      }
+    }
+  },
+  "@setupSourceTotalBytes": {
+    "placeholders": {
+      "mb": {
+        "type": "int"
+      }
+    }
+  }
+}

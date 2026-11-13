@@ -140,6 +140,20 @@ class RuntimeFailure {
 }
 
 /// One entry of assets/channels.json, as the Kotlin side reports it.
+/// A download mirror prefix from channels.json (schema 3).
+class RuntimeSourceInfo {
+  const RuntimeSourceInfo({required this.id, required this.name, required this.prefix});
+  final String id;
+  final String name;
+  final String prefix;
+
+  factory RuntimeSourceInfo.fromMap(Map<Object?, Object?> map) => RuntimeSourceInfo(
+    id: map['id'] as String,
+    name: map['name'] as String? ?? map['id'] as String,
+    prefix: map['prefix'] as String? ?? '',
+  );
+}
+
 class RuntimeChannelInfo {
   const RuntimeChannelInfo({required this.id, required this.name, required this.isDefault});
 
@@ -607,6 +621,44 @@ class RuntimeBridge {
   /// step: 'download' first, then the usual 'extract'.
   Future<void> installChannel(String id) =>
       _methods.invokeMethod<void>('installChannel', {'id': id});
+
+  // ---- Variant channels (schema 3): source choice + base/node/engine mix ----
+
+  Future<List<RuntimeSourceInfo>> channelSources() async {
+    final raw = await _methods.invokeListMethod<Object?>('channelSources');
+    return [
+      for (final e in raw ?? const <Object?>[])
+        RuntimeSourceInfo.fromMap((e! as Map).cast<Object?, Object?>()),
+    ];
+  }
+
+  /// One-byte range probe through a mirror against the channel's index URL.
+  Future<Map<Object?, Object?>> probeChannelSource(String channelId, String sourceId) async {
+    final raw = await _methods.invokeMethod<Object?>(
+        'probeChannelSource', {'channelId': channelId, 'sourceId': sourceId});
+    return (raw! as Map).cast<Object?, Object?>();
+  }
+
+  /// The layers index for a variant channel (raw JSON string; parsed in the state layer).
+  Future<String> layerChannelIndex(String channelId, String sourceId) =>
+      _methods.invokeMethod<String>('layerChannelIndex', {'channelId': channelId, 'sourceId': sourceId});
+
+  /// Installs a variant channel by layer selection. Download/extract progress
+  /// arrives on the events stream like installChannel.
+  Future<void> installLayerChannel({
+    required String channelId,
+    required String sourceId,
+    required String base,
+    required String node,
+    required String engine,
+  }) =>
+      _methods.invokeMethod<void>('installLayerChannel', {
+        'channelId': channelId,
+        'sourceId': sourceId,
+        'base': base,
+        'node': node,
+        'engine': engine,
+      });
 
   /// [phoneStorage] mounts the phone's shared storage at /sdcard (needs [requestStorage] first).
   /// [mode] null keeps the current mode; [EngineMode.normal] while in safe mode starts the

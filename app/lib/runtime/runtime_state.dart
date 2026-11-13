@@ -1,7 +1,9 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:collection';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../state/settings_state.dart';
 import '../state/read_list_epoch.dart';
@@ -108,6 +110,60 @@ class LocalRuntimeController extends Notifier<LocalRuntimeState> {
   /// Download channels for noruntime builds.
   Future<List<RuntimeChannelInfo>> channels() => _bridge.channels();
 
+  // ---- Variant channels (schema 3) ----
+
+  Future<List<RuntimeSourceInfo>> channelSources() => _bridge.channelSources();
+
+  Future<Map<Object?, Object?>> probeSource(String channelId, String sourceId) =>
+      _bridge.probeChannelSource(channelId, sourceId);
+
+  /// Fetches and parses the layers index for [channelId] through [sourceId].
+  Future<LayersIndex?> layersIndex(String channelId, String sourceId) async {
+    try {
+      final raw = await _bridge.layerChannelIndex(channelId, sourceId);
+      return LayersIndex.parse(raw);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> installLayerChannel({
+    required String channelId,
+    required String sourceId,
+    required LayersChoice choice,
+  }) {
+    ref.read(readListCredentialEpochProvider.notifier).advance();
+    return _bridge.installLayerChannel(
+      channelId: channelId,
+      sourceId: sourceId,
+      base: choice.base,
+      node: choice.node,
+      engine: choice.engine,
+    );
+  }
+
+  /// Remembers the person's last mirror + layer selection for next installs.
+  static Future<void> saveVariantPrefs({
+    required String sourceId,
+    required LayersChoice choice,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('runtime.variant.sourceId', sourceId);
+    await prefs.setString('runtime.variant.base', choice.base);
+    await prefs.setString('runtime.variant.node', choice.node);
+    await prefs.setString('runtime.variant.engine', choice.engine);
+  }
+
+  static Future<({String sourceId, LayersChoice? choice})> loadVariantPrefs() async {
+    final prefs = await SharedPreferences.getInstance();
+    final sourceId = prefs.getString('runtime.variant.sourceId') ?? '';
+    final base = prefs.getString('runtime.variant.base');
+    final node = prefs.getString('runtime.variant.node');
+    final engine = prefs.getString('runtime.variant.engine');
+    if (base == null || node == null || engine == null) return (sourceId: sourceId, choice: null);
+    return (sourceId: sourceId, choice: LayersChoice(base: base, node: node, engine: engine));
+  }
+
   /// noruntime first install: download the channel, then unpack.
   Future<void> installChannel(RuntimeChannelInfo channel) {
     ref.read(readListCredentialEpochProvider.notifier).advance();
@@ -207,3 +263,50 @@ class LocalRuntimeLogsController extends Notifier<List<String>> {
 final localRuntimeLogsProvider = NotifierProvider<LocalRuntimeLogsController, List<String>>(
   LocalRuntimeLogsController.new,
 );
+
+
+/// Parsed layers-index.json (schema 3): layer packages the person can mix.
+class LayersIndex {
+  const LayersIndex({required this.base, required this.node, required this.engine});
+  final List<LayerVariant> base;
+  final List<LayerVariant> node;
+  final List<LayerVariant> engine;
+
+  static LayersIndex? parse(String raw) {
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is! Map<String, dynamic>) return null;
+      List<LayerVariant> read(String kind) {
+        final map = decoded['layers']?[kind];
+        if (map is! Map<String, dynamic>) return const [];
+        return [
+          for (final e in map.entries)
+            LayerVariant(
+              key: e.key,
+              asset: (e.value as Map<String, dynamic>)['asset'] as String? ?? '',
+              bytes: ((e.value as Map<String, dynamic>)['bytes'] as num?)?.toInt() ?? 0,
+            ),
+        ]..sort((a, b) => b.key.compareTo(a.key));
+      }
+      final index = LayersIndex(base: read('base'), node: read('node'), engine: read('engine'));
+      if (index.base.isEmpty || index.node.isEmpty || index.engine.isEmpty) return null;
+      return index;
+    } catch (_) {
+      return null;
+    }
+  }
+}
+
+class LayerVariant {
+  const LayerVariant({required this.key, required this.asset, required this.bytes});
+  final String key;
+  final String asset;
+  final int bytes;
+}
+
+class LayersChoice {
+  const LayersChoice({required this.base, required this.node, required this.engine});
+  final String base;
+  final String node;
+  final String engine;
+}

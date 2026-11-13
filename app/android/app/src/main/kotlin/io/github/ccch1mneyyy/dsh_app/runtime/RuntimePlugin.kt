@@ -105,9 +105,23 @@ class RuntimePlugin :
                 }.getOrElse { emptyList() })
             }
             "probeChannelSource" -> {
-                val url = call.argument<String>("url")
-                    ?: return result.error("bad_args", "url required", null)
-                Thread { result.success(LayerChannels.probe(url)) }.start()
+                // Probe the real index URL through the chosen mirror so the
+                // person sees the latency of the exact path the install uses.
+                val channelId = call.argument<String>("channelId")
+                val sourceId = call.argument<String>("sourceId") ?: ""
+                if (channelId.isNullOrEmpty()) return result.error("bad_args", "channelId required", null)
+                Thread {
+                    try {
+                        val channel = ChannelRegistry.layerChannels(appContext)
+                            .firstOrNull { it.id == channelId }
+                            ?: throw java.io.IOException("unknown layer channel")
+                        val source = ChannelRegistry.sources(appContext)
+                            .firstOrNull { it.id == sourceId } ?: ChannelRegistry.Source(sourceId, sourceId, "")
+                        result.success(LayerChannels.probe(source.prefix + channel.githubBase + channel.indexPath))
+                    } catch (e: Exception) {
+                        result.success(mapOf("ok" to false, "latencyMs" to -1, "status" to -1))
+                    }
+                }.start()
             }
             "layerChannelIndex" -> {
                 val channelId = call.argument<String>("channelId")

@@ -1,7 +1,33 @@
 {
-  "schema": 1,
-  "default": "dsh-go-r15",
+  "schema": 3,
+  "default": "dsh-go-layers",
+  "sources": [
+    {
+      "id": "ghfast",
+      "name": "ghfast.top · 国内加速",
+      "prefix": "https://ghfast.top/"
+    },
+    {
+      "id": "ghproxy",
+      "name": "gh-proxy.com · 国内加速",
+      "prefix": "https://gh-proxy.com/"
+    },
+    {
+      "id": "github",
+      "name": "GitHub 直连",
+      "prefix": ""
+    }
+  ],
   "channels": [
+    {
+      "id": "dsh-go-layers",
+      "name": "官方运行时 · 分层可选（底座 / Node / DSH）",
+      "githubBase": "https://github.com/zhizhicat/DSH-APP/releases/download/runtime-layers/",
+      "index": {
+        "path": "layers-index.json",
+        "sha256": ""
+      }
+    },
     {
       "id": "dsh-go-r15",
       "name": "官方运行时 r15 · Ubuntu 24.04.5 · Node 24.22.1 · DSH 0.2.2-rc.1",

@@ -61,6 +61,25 @@ class RuntimeInstallController extends Notifier<bool> {
     });
   }
 
+  /// noruntime first install through a variant channel: the person's mirror
+  /// and base/node/engine selection, fetched through the source they picked.
+  Future<void> installVariant(String sourceId, LayersChoice choice) {
+    if (_pending case final pending?) return pending;
+    if (ref.read(localRuntimeProvider).status.phase == RuntimePhase.installing) return Future.value();
+    final runtime = ref.read(localRuntimeProvider.notifier);
+    final run = _pending = _run(() async {
+      final channels = await runtime.channels();
+      final channel = channels.firstWhere((c) => c.id.contains('layers'),
+          orElse: () => channels.first);
+      await LocalRuntimeController.saveVariantPrefs(sourceId: sourceId, choice: choice);
+      await runtime.installLayerChannel(
+        channelId: channel.id, sourceId: sourceId, choice: choice);
+    });
+    return run.whenComplete(() {
+      if (identical(_pending, run)) _pending = null;
+    });
+  }
+
   /// The one entry for a plain install request (engine page, drawer, onboarding,
   /// root gate): a complete package unpacks, a noruntime build downloads the
   /// default channel first. [dropKept] always takes the bundled path: a

@@ -17394,6 +17394,48 @@ class L10nEn extends L10n {
   String get setupAwaitSignIn => 'DeepSeek sign-in opens when it’s ready';
 
   @override
+  String get setupSourceTitle => 'Download source & versions';
+
+  @override
+  String get setupSourceMessage => 'Pick a mirror, then the base, Node and DSH to pull';
+
+  @override
+  String get setupSourceSection => 'Download source';
+
+  @override
+  String get setupSourceVersions => 'Runtime versions';
+
+  @override
+  String get setupSourceProbing => 'Probing…';
+
+  @override
+  String get setupSourceUnreachable => 'Unreachable';
+
+  @override
+  String setupSourceMs(int ms) => '{ms} ms';
+
+  @override
+  String get setupSourceIndexFailed => 'Could not fetch the version list. Try another mirror, or use the default channel.';
+
+  @override
+  String get setupSourceUseDefault => 'Use the default channel';
+
+  @override
+  String setupSourceTotalBytes(int mb) => 'About {mb} MB to download';
+
+  @override
+  String get setupSourceStart => 'Start download';
+
+  @override
+  String get setupVariantBase => 'Base system';
+
+  @override
+  String get setupVariantNode => 'Node.js';
+
+  @override
+  String get setupVariantEngine => 'DSH';
+
+  @override
   String get shellApiKeyPrefixWarning => 'DeepSeek keys usually start with sk-. Check you copied the right key.';
 
   @override

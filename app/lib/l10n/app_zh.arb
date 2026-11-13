@@ -10050,6 +10050,34 @@
   "setupWaitingBody": "完成后自动进入",
   "setupNotifyWhenDone": "完成时会通知你",
   "setupAwaitSignIn": "就绪后自动打开 DeepSeek 登录",
+  "setupSourceTitle": "下载源与版本",
+  "setupSourceMessage": "选择从哪里下载，以及要哪套运行环境",
+  "setupSourceSection": "下载源",
+  "setupSourceVersions": "运行环境版本",
+  "setupSourceProbing": "探测中…",
+  "setupSourceUnreachable": "无法连接",
+  "setupSourceMs": "{ms} 毫秒",
+  "@setupSourceMs": {
+    "placeholders": {
+      "ms": {
+        "type": "int"
+      }
+    }
+  },
+  "setupSourceIndexFailed": "拉取版本列表失败。换一个源试试，或用默认通道。",
+  "setupSourceUseDefault": "用默认通道下载",
+  "setupSourceTotalBytes": "共需下载约 {mb} MB",
+  "@setupSourceTotalBytes": {
+    "placeholders": {
+      "mb": {
+        "type": "int"
+      }
+    }
+  },
+  "setupSourceStart": "开始下载",
+  "setupVariantBase": "系统底座",
+  "setupVariantNode": "Node.js",
+  "setupVariantEngine": "DSH",
   "shellApiKeyPrefixWarning": "DeepSeek 的 Key 通常以 sk- 开头，确认没有复制错",
   "shellApiKeyIncompleteWarning": "Key 似乎不完整，确认复制了整串",
   "shellBrowserUrlCopied": "没能打开浏览器，网址已复制",

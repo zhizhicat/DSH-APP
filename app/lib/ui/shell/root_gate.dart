@@ -164,11 +164,32 @@ class _RootGateState extends ConsumerState<RootGate> {
     unawaited(EngineControl.ensureStarted(_container));
   }
 
-  /// 「本机」: unpack in the background, set up meanwhile.
+  /// 「本机」: unpack in the background, set up meanwhile. A noruntime build
+  /// with variant channels first asks which mirror and versions to pull.
   void _chooseLocal() {
     _beside = true;
     unawaited(_prefs.setSetupStep(SetupStep.appearance));
+    unawaited(_maybeChooseSource());
+  }
+
+  Future<void> _maybeChooseSource() async {
+    try {
+      final channels = await ref.read(localRuntimeProvider.notifier).channels();
+      if (channels.any((c) => c.id.contains('layers'))) {
+        _goTo(OnboardingStep.downloadSource);
+        return;
+      }
+    } catch (_) {/* fall through to the flat channel */}
     _startUnpack();
+    _goTo(OnboardingStep.appearance);
+  }
+
+  /// The source+version page picked; install that mix and carry on beside it.
+  void _afterSource(String sourceId, LayersChoice choice) {
+    unawaited(_prefs.setSetupStep(SetupStep.appearance));
+    ref.read(installEtaProvider);
+    unawaited(ref.read(runtimeInstallProvider.notifier).installVariant(sourceId, choice));
+    unawaited(ref.read(notifyChannelProvider).status().then<void>((_) {}, onError: (_) {}));
     _goTo(OnboardingStep.appearance);
   }
 
@@ -346,6 +367,7 @@ class _RootGateState extends ConsumerState<RootGate> {
           chooseRuntime: _chooseRuntime,
           beside: _beside,
           onLocal: _chooseRuntime ? _chooseLocal : null,
+          onSourceDone: _afterSource,
           onAppearanceDone: _afterAppearance,
           onAccessDone: _afterAccess,
           onFinished: _afterFinishing,

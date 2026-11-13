@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'access_step.dart';
+import 'download_source_step.dart';
 import 'appearance_step.dart';
 import 'connect_page.dart';
 import 'onboarding_scaffold.dart';
@@ -16,7 +17,7 @@ import 'welcome_page.dart';
 /// and [apiKey] follow while it unpacks, and [finishing] waits for whatever
 /// is left of it. Upgrades, resets and a phone that only needs a key go
 /// [runtime] (the unpack itself) → [apiKey].
-enum OnboardingStep { welcome, runtime, appearance, access, apiKey, finishing }
+enum OnboardingStep { welcome, runtime, downloadSource, appearance, access, apiKey, finishing }
 
 /// Moves between the first-run pages. The step itself is owned by the root
 /// gate, which also decides where a returning user resumes.
@@ -34,6 +35,7 @@ class OnboardingFlow extends StatefulWidget {
     this.chooseRuntime = false,
     this.onRemote,
     this.onLocal,
+    this.onSourceDone,
     this.onAppearanceDone,
     this.onAccessDone,
     this.onFinished,
@@ -55,6 +57,11 @@ class OnboardingFlow extends StatefulWidget {
   /// Picked 「本机」: the caller starts the unpack and moves on to
   /// [OnboardingStep.appearance]. Null: the runtime page installs itself.
   final VoidCallback? onLocal;
+
+  /// The variant source+version page picked a mirror and layers; the caller
+  /// starts the variant unpack and moves on like [onLocal] would. Null: the
+  /// page was not offered.
+  final void Function(String sourceId, LayersChoice choice)? onSourceDone;
 
   final VoidCallback? onAppearanceDone;
 
@@ -85,6 +92,9 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
     final step = widget.step;
     final Widget page = switch (step) {
       OnboardingStep.welcome => WelcomePage(onStart: widget.onWelcomeDone),
+      OnboardingStep.downloadSource => DownloadSourceStepPage(
+        onDone: widget.onSourceDone ?? (_, _) => widget.onRuntimeDone(),
+      ),
       OnboardingStep.runtime => RuntimeSetupPage(
         onDone: widget.onRuntimeDone,
         choose: widget.chooseRuntime,

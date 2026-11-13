@@ -30218,6 +30218,90 @@ abstract class L10n {
   /// **'就绪后自动打开 DeepSeek 登录'**
   String get setupAwaitSignIn;
 
+  /// No description provided for @setupSourceTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'下载源与版本'**
+  String get setupSourceTitle;
+
+  /// No description provided for @setupSourceMessage.
+  ///
+  /// In zh, this message translates to:
+  /// **'选择从哪里下载，以及要哪套运行环境'**
+  String get setupSourceMessage;
+
+  /// No description provided for @setupSourceSection.
+  ///
+  /// In zh, this message translates to:
+  /// **'下载源'**
+  String get setupSourceSection;
+
+  /// No description provided for @setupSourceVersions.
+  ///
+  /// In zh, this message translates to:
+  /// **'运行环境版本'**
+  String get setupSourceVersions;
+
+  /// No description provided for @setupSourceProbing.
+  ///
+  /// In zh, this message translates to:
+  /// **'探测中…'**
+  String get setupSourceProbing;
+
+  /// No description provided for @setupSourceUnreachable.
+  ///
+  /// In zh, this message translates to:
+  /// **'无法连接'**
+  String get setupSourceUnreachable;
+
+  /// No description provided for @setupSourceMs.
+  ///
+  /// In zh, this message translates to:
+  /// **'{ms} 毫秒'**
+  String setupSourceMs(int ms);
+
+  /// No description provided for @setupSourceIndexFailed.
+  ///
+  /// In zh, this message translates to:
+  /// **'拉取版本列表失败。换一个源试试，或用默认通道。'**
+  String get setupSourceIndexFailed;
+
+  /// No description provided for @setupSourceUseDefault.
+  ///
+  /// In zh, this message translates to:
+  /// **'用默认通道下载'**
+  String get setupSourceUseDefault;
+
+  /// No description provided for @setupSourceTotalBytes.
+  ///
+  /// In zh, this message translates to:
+  /// **'共需下载约 {mb} MB'**
+  String setupSourceTotalBytes(int mb);
+
+  /// No description provided for @setupSourceStart.
+  ///
+  /// In zh, this message translates to:
+  /// **'开始下载'**
+  String get setupSourceStart;
+
+  /// No description provided for @setupVariantBase.
+  ///
+  /// In zh, this message translates to:
+  /// **'系统底座'**
+  String get setupVariantBase;
+
+  /// No description provided for @setupVariantNode.
+  ///
+  /// In zh, this message translates to:
+  /// **'Node.js'**
+  String get setupVariantNode;
+
+  /// No description provided for @setupVariantEngine.
+  ///
+  /// In zh, this message translates to:
+  /// **'DSH'**
+  String get setupVariantEngine;
+
   /// No description provided for @shellApiKeyPrefixWarning.
   ///
   /// In zh, this message translates to:

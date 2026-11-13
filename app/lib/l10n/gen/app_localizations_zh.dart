@@ -16511,6 +16511,48 @@ class L10nZh extends L10n {
   String get setupAwaitSignIn => '就绪后自动打开 DeepSeek 登录';
 
   @override
+  String get setupSourceTitle => '下载源与版本';
+
+  @override
+  String get setupSourceMessage => '选择从哪里下载，以及要哪套运行环境';
+
+  @override
+  String get setupSourceSection => '下载源';
+
+  @override
+  String get setupSourceVersions => '运行环境版本';
+
+  @override
+  String get setupSourceProbing => '探测中…';
+
+  @override
+  String get setupSourceUnreachable => '无法连接';
+
+  @override
+  String setupSourceMs(int ms) => '{ms} 毫秒';
+
+  @override
+  String get setupSourceIndexFailed => '拉取版本列表失败。换一个源试试，或用默认通道。';
+
+  @override
+  String get setupSourceUseDefault => '用默认通道下载';
+
+  @override
+  String setupSourceTotalBytes(int mb) => '共需下载约 {mb} MB';
+
+  @override
+  String get setupSourceStart => '开始下载';
+
+  @override
+  String get setupVariantBase => '系统底座';
+
+  @override
+  String get setupVariantNode => 'Node.js';
+
+  @override
+  String get setupVariantEngine => 'DSH';
+
+  @override
   String get shellApiKeyPrefixWarning => 'DeepSeek 的 Key 通常以 sk- 开头，确认没有复制错';
 
   @override
