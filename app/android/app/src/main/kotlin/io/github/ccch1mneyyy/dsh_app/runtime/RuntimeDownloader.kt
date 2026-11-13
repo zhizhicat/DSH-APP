@@ -68,7 +68,10 @@ internal class RuntimeDownloader(
         val dm = app.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
         val request = DownloadManager.Request(Uri.parse(url)).apply {
             setTitle(part.name.removeSuffix(".part"))
-            setNotificationVisibility(DownloadManager.Request.VISIBILITY_HIDDEN)
+            // VISIBILITY_HIDDEN(=2) 在新版 Android 只许系统应用使用，enqueue 直接抛
+            // SecurityException: Invalid value for visibility: 2（真机实锤）。
+            // 改用 VISIBILITY_VISIBLE_COMPLETED(=1)：下载中显示普通通知，完成可点开。
+            setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_COMPLETED)
             setDestinationInExternalFilesDir(app, null, part.name)
             setAllowedOverMetered(true)
             setAllowedOverRoaming(true)
