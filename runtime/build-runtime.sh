@@ -672,12 +672,20 @@ for abi in abis:
         base = rec["layers"]["base"]; node = rec["layers"]["node"]; engine = rec["layers"]["engine"]
         uv = rec.get("ubuntuVersion") or ""   # full BASE spec, e.g. "ubuntu-24.04.5" / "debian-12"
         nv = (rec.get("nodeVersion") or "").replace("node-v", "")
-        if uv: layers["base"][uv] = dict(base, abi=abi)
-        if nv: layers["node"][nv] = dict(node, abi=abi)
         stem = engine["asset"]
         for suffix in ("-%s.tar.xz" % abi, "-%s.tar.gz" % abi):
             stem = stem[:-len(suffix)] if stem.endswith(suffix) else stem
         engine_key = stem.split("-dsh", 1)[1] if "-dsh" in stem else None
+        dsh_ver = engine_key.split("-node", 1)[0] if engine_key else ""   # engine-dsh<ver>-node<node>-...
+        manifest_path = os.path.join(out, "variants", "manifest-%s-%s-%s-%s.json" % (uv, nv.replace("node-v",""), dsh_ver, abi))
+        if uv and os.path.exists(manifest_path):
+            m = json.load(open(manifest_path))
+            # runtimeVersion also travels with the base variant: the installer matches the
+            # app-built manifest version against etc/dsh-app/runtime.json inside the rootfs.
+            for k in ("upgrade", "baseCompatibility", "runtimeVersion"):
+                if k in m: base[k] = m[k]
+        if uv: layers["base"][uv] = dict(base, abi=abi)
+        if nv: layers["node"][nv] = dict(node, abi=abi)
         if engine_key: layers["engine"][engine_key] = dict(engine, abi=abi)
     # carry what the app needs to build a RuntimeManifest per abi (launch argv/env,
     # direct engine seams, dsh metadata); taken from the first variant manifest.

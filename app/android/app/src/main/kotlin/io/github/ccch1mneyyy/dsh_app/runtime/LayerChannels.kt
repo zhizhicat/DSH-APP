@@ -84,7 +84,9 @@ internal object LayerChannels {
 
         val manifest = JSONObject()
         manifest.put("schema", 2)
-        manifest.put("runtimeVersion", "layers-dsh$engineKey-node$nodeKey-base$baseKey")
+        // The real build version string (matches etc/dsh-app/runtime.json inside the rootfs);
+        // falls back to the composed form only for older indexes that lack it.
+        manifest.put("runtimeVersion", base.optString("runtimeVersion", "layers-dsh$engineKey-node$nodeKey-base$baseKey"))
         manifest.put("abi", abi)
         manifest.put("dshVersion", abiInfo.optString("dshVersion", engineKey))
         manifest.put("nodeVersion", nodeKey)
@@ -97,6 +99,12 @@ internal object LayerChannels {
         if (launch != null) manifest.put("launch", launch)
         val direct = abiInfo.optJSONObject("directEngine")
         if (direct != null) manifest.put("directEngine", direct)
+        // The installer verifies the unpacked rootfs against upgrade.baseId and
+        // baseCompatibility; both are per-base-distro and travel on the base entry.
+        val upgrade = base.optJSONObject("upgrade")
+        if (upgrade != null) manifest.put("upgrade", upgrade)
+        val baseCompat = base.optJSONObject("baseCompatibility")
+        if (baseCompat != null) manifest.put("baseCompatibility", baseCompat)
         val manifestLayers = JSONObject()
         manifestLayers.put("base", base)
         manifestLayers.put("node", node)
