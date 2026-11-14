@@ -99,13 +99,24 @@ jobs:
           fi
           ls -lh ../../out/arm64-v8a/jniLibs/arm64-v8a/
 
+      # 2026-11-14: runner-images#13882 —— 编译步随机 stall 挂死（多平台，本周起）。
+      # 对策：单次构建限时 25 分钟，超时/失败自动重试至多 3 次，绕过 runner 抽风。
       - name: Build arm64 release APK
         run: |
-          if [ "$RUNTIME_MODE" = full ]; then
-            bash tooling/build-apk.sh
-          else
-            bash tooling/build-apk.sh --noruntime
-          fi
+          set -uo pipefail
+          ok=0
+          for attempt in 1 2 3; do
+            echo "::notice::build attempt $attempt"
+            if [ "$RUNTIME_MODE" = full ]; then
+              timeout -k 30 1500 bash tooling/build-apk.sh
+            else
+              timeout -k 30 1500 bash tooling/build-apk.sh --noruntime
+            fi
+            rc=$?
+            if [ $rc -eq 0 ]; then ok=1; break; fi
+            echo "::warning::build attempt $attempt failed (rc=$rc), retrying"
+          done
+          [ $ok -eq 1 ] || { echo "all build attempts failed"; exit 1; }
 
       - name: Show build outputs
         run: |
