@@ -17412,16 +17412,21 @@ class L10nEn extends L10n {
   String get setupSourceUnreachable => 'Unreachable';
 
   @override
-  String setupSourceMs(int ms) => '{ms} ms';
+  String setupSourceMs(int ms) {
+    return '$ms ms';
+  }
 
   @override
-  String get setupSourceIndexFailed => 'Could not fetch the version list. Try another mirror, or use the default channel.';
+  String get setupSourceIndexFailed =>
+      'Could not fetch the version list. Try another mirror, or use the default channel.';
 
   @override
   String get setupSourceUseDefault => 'Use the default channel';
 
   @override
-  String setupSourceTotalBytes(int mb) => 'About {mb} MB to download';
+  String setupSourceTotalBytes(int mb) {
+    return 'About $mb MB to download';
+  }
 
   @override
   String get setupSourceStart => 'Start download';

@@ -389,9 +389,24 @@ class RuntimeController private constructor(private val app: Context) : DshProce
                 synchronized(this) { channelManifest = m }
                 val inst = RuntimeInstaller(app, m, ::note, source = FileArchiveSource(downloads))
                     .also { channelInstaller = it }
-                log("[dsh-app] layers ${baseKey}/${nodeKey}/${engineKey}: downloading ${m.archives.size} layer(s) " +
-                    "(${m.archives.sumOf { it.bytes }.let { b -> if (b > 0) b / (1024 * 1024) else -1 }}MB)", "system")
-                for (archive in m.archivesForInstall(false)) {
+                // Hot engine upgrade: when the active rootfs already matches the
+                // chosen base and node layers, download only the engine archive.
+                // Installer unpacks and activates the same engine-only set on an
+                // existing rootfs, so the download list must match that judgment.
+                val installedInfo = runCatching {
+                    JSONObject(File(inst.rootfs, "etc/dsh-app/runtime.json").readText())
+                }.getOrNull()
+                val hot = installedInfo != null && runCatching {
+                    installedInfo.getJSONObject("upgrade").getString("baseId") ==
+                        m.raw.getJSONObject("upgrade").getString("baseId") &&
+                        installedInfo.optString("nodeVersion") == nodeKey
+                }.getOrDefault(false)
+                val toDownload = if (hot) m.archives.takeLast(1) else m.archivesForInstall(false)
+                if (hot) log("[dsh-app] layers ${baseKey}/${nodeKey}/${engineKey}: hot engine upgrade, " +
+                    "base and node already active", "system")
+                log("[dsh-app] layers ${baseKey}/${nodeKey}/${engineKey}: downloading ${toDownload.size} layer(s) " +
+                    "(${toDownload.sumOf { it.bytes }.let { b -> if (b > 0) b / (1024 * 1024) else -1 }}MB)", "system")
+                for (archive in toDownload) {
                     downloader.download(
                         source.prefix + channel.githubBase + archive.asset,
                         File(downloads, archive.asset), archive.sha256, archive.bytes,

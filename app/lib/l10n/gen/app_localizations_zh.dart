@@ -16529,7 +16529,9 @@ class L10nZh extends L10n {
   String get setupSourceUnreachable => '无法连接';
 
   @override
-  String setupSourceMs(int ms) => '{ms} 毫秒';
+  String setupSourceMs(int ms) {
+    return '$ms 毫秒';
+  }
 
   @override
   String get setupSourceIndexFailed => '拉取版本列表失败。换一个源试试，或用默认通道。';
@@ -16538,7 +16540,9 @@ class L10nZh extends L10n {
   String get setupSourceUseDefault => '用默认通道下载';
 
   @override
-  String setupSourceTotalBytes(int mb) => '共需下载约 {mb} MB';
+  String setupSourceTotalBytes(int mb) {
+    return '共需下载约 $mb MB';
+  }
 
   @override
   String get setupSourceStart => '开始下载';
