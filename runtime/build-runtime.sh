@@ -284,7 +284,11 @@ PYEOF
   while read -r file sum; do
     name="$(basename "$file")"
     # Superseded versions can leave the mirror; keep the locked bytes and hash.
-    fetch "$mirror/$file" "$CACHE/$DISTRO/debs/$name" "$sum"
+    # Debian: a version resolved from the security pool lives in debian-security, not the main pool.
+    case "$DISTRO" in
+      debian) fetch "$mirror/$file" "$CACHE/$DISTRO/debs/$name" "$sum" "$DEBIAN_SECURITY/$file" ;;
+      *)      fetch "$mirror/$file" "$CACHE/$DISTRO/debs/$name" "$sum" "$UBUNTU_DEB_FALLBACK/$name" ;;
+    esac
     printf '%s\n' "$CACHE/$DISTRO/debs/$name"
   done
 }
