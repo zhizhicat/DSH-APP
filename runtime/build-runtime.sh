@@ -78,6 +78,7 @@ NPM_REGISTRY="https://registry.npmmirror.com"
 TERMUX_REPO="https://packages.termux.dev/apt/termux-main"
 DEBIAN_LXC_MIRROR="https://mirrors.tuna.tsinghua.edu.cn/lxc-images/images/debian"  # debian BASE: <codename>/<arch>/default/<LXC_DATE>/rootfs.tar.xz
 DEBIAN_ARCHIVE="https://mirrors.tuna.tsinghua.edu.cn/debian"                      # debian BASE: one pool serves both architectures
+DEBIAN_SECURITY="https://mirrors.tuna.tsinghua.edu.cn/debian-security"            # debian security updates live in a separate pool
 UBUNTU_ARCHIVE_AMD64="https://mirrors.tuna.tsinghua.edu.cn/ubuntu"        # InRelease verified with gpgv
 UBUNTU_ARCHIVE_ARM64="https://mirrors.tuna.tsinghua.edu.cn/ubuntu-ports"
 UBUNTU_DEB_FALLBACK="https://launchpad.net/ubuntu/+archive/primary/+files"
@@ -257,18 +258,20 @@ with tarfile.open(sys.argv[1], "r:*") as t:
     else:
         sys.exit("keyring not found in base tarball")
 PYEOF
-    local -a idx=() ; local suite want suites=()
+    local -a idx=() ; local suite want suites=() mirror_suite
     case "$DISTRO" in
       ubuntu) suites=("$APT_CODENAME" "$APT_CODENAME-updates" "$APT_CODENAME-security") ;;
       debian) suites=("$APT_CODENAME" "$APT_CODENAME-updates" "$APT_CODENAME-security") ;;
     esac
     for suite in "${suites[@]}"; do
-      fetch "$mirror/dists/$suite/InRelease" "$dir/$suite.InRelease"
+      # Debian's -security updates live in a separate pool (debian-security); everything else is main.
+      [[ "$DISTRO" == debian && "$suite" == *-security ]] && mirror_suite="$DEBIAN_SECURITY" || mirror_suite="$mirror"
+      fetch "$mirror_suite/dists/$suite/InRelease" "$dir/$suite.InRelease"
       gpgv --keyring "$dir/archive-keyring.gpg" "$dir/$suite.InRelease" 2>/dev/null \
         || die "InRelease signature check failed for $suite"
       want="$(awk -v f="main/binary-$arch/Packages.xz" '/^SHA256:/{s=1;next} /^[A-Za-z]/{s=0} s && $3==f {print $1}' "$dir/$suite.InRelease")"
       [[ -n "$want" ]] || die "no Packages.xz hash for $suite/$arch"
-      fetch "$mirror/dists/$suite/main/binary-$arch/Packages.xz" "$dir/$suite.Packages.xz" "$want"
+      fetch "$mirror_suite/dists/$suite/main/binary-$arch/Packages.xz" "$dir/$suite.Packages.xz" "$want"
       idx+=(--packages "$dir/$suite.Packages.xz")
     done
     mkdir -p "$LOCKS"
