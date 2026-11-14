@@ -19,9 +19,19 @@ internal val ENGINE_PATHS = listOf(
     "usr/local/bin/corepack", "usr/local/bin/pnpm", "usr/local/bin/pnpx", "usr/local/bin/pn", "usr/local/bin/pnx",
 )
 
+// The layered build (schema 3, base × node × engine) moves opt/node and the node
+// bins into NODE_PATHS on the build side, so the engine archive's upgrade.paths
+// carries only the engine-owned set. Both sets are valid upgrade payloads.
+internal val LAYERED_ENGINE_PATHS = listOf(
+    "opt/dsh", "opt/dsh-go", "etc/dsh-app",
+    "etc/profile.d/dsh-app.sh", "usr/local/lib/node_modules/pnpm",
+    "usr/local/bin/dsh", "usr/local/bin/pnpm", "usr/local/bin/pnpx", "usr/local/bin/pn", "usr/local/bin/pnx",
+)
+
 internal data class EngineUpgradeSpec(val baseId: String, val ubuntuVersion: String, val paths: List<String>) {
     fun validate() {
-        if (!baseId.matches(Regex("[a-f0-9]{64}")) || ubuntuVersion.isBlank() || paths != ENGINE_PATHS) {
+        if (!baseId.matches(Regex("[a-f0-9]{64}")) || ubuntuVersion.isBlank() ||
+            (paths != ENGINE_PATHS && paths != LAYERED_ENGINE_PATHS)) {
             throw RuntimeUpgradeBlocked("manifest")
         }
     }
@@ -88,7 +98,8 @@ internal class EngineUpgrade(
         validateVersion(version)
         val original = try { File(pending, "original").readLines() }
             catch (_: Exception) { throw RuntimeUpgradeBlocked("transaction") }
-        if (original.distinct() != original || original.any { it !in ENGINE_PATHS }) {
+        if (original.distinct() != original ||
+            original.any { it !in ENGINE_PATHS && it !in LAYERED_ENGINE_PATHS }) {
             throw RuntimeUpgradeBlocked("transaction")
         }
         for (path in ENGINE_PATHS) {

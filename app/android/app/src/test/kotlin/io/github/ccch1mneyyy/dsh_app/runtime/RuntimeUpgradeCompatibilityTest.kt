@@ -47,6 +47,19 @@ class RuntimeUpgradeCompatibilityTest {
         assertEquals("a".repeat(64), check().baseId)
     }
 
+    @Test fun layeredEnginePathsValidate() {
+        // The schema-3 layered build carries the engine-only path set; it must
+        // pass validate the same way the legacy 15-path full bundle does.
+        val spec = EngineUpgradeSpec("a".repeat(64), "24.04.5", LAYERED_ENGINE_PATHS)
+        spec.validate()
+    }
+
+    @Test fun unknownPathSetsAreRejected() {
+        assertThrows(RuntimeUpgradeBlocked::class.java) {
+            EngineUpgradeSpec("a".repeat(64), "24.04.5", LAYERED_ENGINE_PATHS + "opt/rogue").validate()
+        }
+    }
+
     @Test fun legacyRuntimeIsAdoptedWithoutReplacingItsSystemOrPythonPackages() {
         installed(layered = false)
         write("rootfs/opt/python/lib/site-packages/custom.py", "user pip package")
