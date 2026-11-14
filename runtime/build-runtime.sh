@@ -171,7 +171,8 @@ rootfs_base() {  # $1 = distro arch (arm64|amd64); echoes path to the verified b
 }
 
 debian_base() {  # LXC images rootfs; no upstream SHA256SUMS exists, so a PIN entry is mandatory
-  local arch="$1" name="debian-rootfs-$BASE_VER-$LXC_DATE-$arch.tar.xz"
+  local arch="$1"
+  local name="debian-rootfs-$BASE_VER-$LXC_DATE-$arch.tar.xz"
   local dir="$CACHE/debian/$BASE_VER"
   local pin; pin="$(pin_of "$name")"
   [[ -n "$pin" ]] || die "no sha256 PIN for $name — lxc-images publishes no checksums; compute and add one"
