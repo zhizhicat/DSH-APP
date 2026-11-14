@@ -262,7 +262,7 @@ class _SourceRow extends StatelessWidget {
       title: Text(source.name),
       trailing: trailing,
       leading: Icon(
-        selectedId == source.id ? Icons.radio_button_checked : Icons.radio_button_off,
+        selectedId == source.id ? AppIcons.radioOn : AppIcons.radioOff,
         size: 20,
       ),
       onTap: onTap,
@@ -295,7 +295,7 @@ class _VariantRow extends StatelessWidget {
               child: Row(mainAxisSize: MainAxisSize.min, children: [
                 Text(selected.key),
                 const SizedBox(width: 4),
-                const Icon(Icons.expand_more, size: 18),
+                const Icon(AppIcons.expand, size: 18),
               ]),
             )
           : null,
