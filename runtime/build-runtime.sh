@@ -722,7 +722,8 @@ main() {
       [[ "$BASE" != *-* ]] && BASE="ubuntu-$BASE"
       DISTRO="${BASE%%-*}"; BASE_VER="${BASE#*-}"
       case "$DISTRO" in
-        ubuntu) UBUNTU_VERSION="$BASE_VER"; APT_CODENAME="$([[ "$BASE_VER" == 24.* ]] && echo noble || echo resolute)" ;;
+        ubuntu) UBUNTU_VERSION="$BASE_VER"; APT_CODENAME="$([[ "$BASE_VER" == 24.* ]] && echo noble || echo resolute)"
+                UBUNTU_MIRROR="https://mirrors.tuna.tsinghua.edu.cn/ubuntu-cdimage/ubuntu-base/releases/${BASE_VER%.*}/release" ;;
         debian) UBUNTU_VERSION=""; APT_CODENAME="$([[ "$BASE_VER" == 12 ]] && echo bookworm || echo trixie)" ;;
         *) die "unsupported BASE distro: $BASE" ;;
       esac
