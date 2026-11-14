@@ -1573,12 +1573,16 @@ def cmd_assemble(args):
         base, node_layer, engine = partition_entries(entries)
         compatibility = base_compatibility(base, with_python=bool(args.python))
         runtime_info["baseCompatibility"] = compatibility
-        # engine runtime.json must not embed combo-specific fields (ubuntu/node
-        # versions), so the engine archive stays identical across combos.
-        engine_info = {k: v for k, v in runtime_info.items()
-                       if k not in ("ubuntuVersion", "nodeVersion", "baseCompatibility")}
-        engine_info["layerSchema"] = 3
-        entries["etc/dsh-app/runtime.json"].data = (json.dumps(engine_info, indent=2, sort_keys=True) + "\n").encode()
+        # runtime.json carries the variant identity (runtimeVersion / upgrade /
+        # baseCompatibility). The BASE layer is per-distro and cache-keyed by its
+        # content, so the identity belongs there: the installer then compares the
+        # unpacked rootfs against an app-built manifest of the same base variant,
+        # while the engine archive stays byte-identical across combos. (Before,
+        # the stripped runtime.json inside the shared engine archive froze the
+        # identity of whichever combo packed it, blocking every other combo.)
+        entries["etc/dsh-app/runtime.json"].data = (json.dumps(runtime_info, indent=2, sort_keys=True) + "\n").encode()
+        base["etc/dsh-app/runtime.json"] = entries["etc/dsh-app/runtime.json"]
+        engine.pop("etc/dsh-app/runtime.json", None)
         base_stats, cache = write_base_archive(base, args.base_out, args, sources)
         node_stats = write_archive(node_layer, args.node_out, args, layered=True)
         engine_stats = write_archive(engine, args.engine_out, args, layered=True)
