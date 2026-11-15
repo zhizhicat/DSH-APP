@@ -390,9 +390,11 @@ export_deltas() {  # v1.5 compose 块素材：原始物 sha+镜像组、增量�
     local fname; fname="$(basename "$base")"
     for m in $UBUNTU_CDIMAGE_MIRRORS; do mirrors+=("$m/${UBUNTU_VERSION%.*}/release/$fname"); done
   fi
-  python3 - "$base_json" "$base" "$node" "$python" "$DISTRO" <<'PYD'
+  printf '%s\n' "${mirrors[@]}" > "$cdir/base-mirrors-${BASE}-${abi}.txt"
+  DELTA_NODE_VERSION="$NODE_VERSION" DELTA_NODE_FILE="$(basename "$node")" \
+    python3 - "$base_json" "$base" "$node" "$python" "$cdir/base-mirrors-${BASE}-${abi}.txt" <<'PYD'
 import json, sys, os, hashlib
-out, base, node, python_, distro = sys.argv[1:6]
+out, base, node, python_ = sys.argv[1:5]
 def sha(p):
     h = hashlib.sha256()
     with open(p, "rb") as f:
@@ -404,11 +406,7 @@ doc = {"schema": 1, "base": {"rootfs": {"mirrors": mirrors, "sha256": sha(base)}
        "node": {"tar": {"sha256": sha(node), "version": os.environ["DELTA_NODE_VERSION"],
                         "file": os.environ["DELTA_NODE_FILE"]}}}
 json.dump(doc, open(out, "w"), indent=2, sort_keys=True)
-print("wrote " + out)
 PYD
-  printf '%s\n' "${mirrors[@]}" > "$cdir/base-mirrors-${BASE}-${abi}.txt"
-  DELTA_NODE_VERSION="$NODE_VERSION" DELTA_NODE_FILE="$(basename "$node")" \
-    python3 - "$base_json" "$base" "$node" "$python" "$cdir/base-mirrors-${BASE}-${abi}.txt" >/dev/null
 
   # base 增量包：debs + python（无国内镜像的私有输入物）
   if [[ ${#debs[@]} -gt 0 || -n "$python" ]]; then
