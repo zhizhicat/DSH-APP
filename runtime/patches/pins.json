@@ -140,12 +140,8 @@
           "before": "992daf485e2d479ac1df3886019946d0bf512ef6517ec730ce4c7315f9472ecc"
         }
       },
-      "0.2.2-rc.2": {
-        "node_modules/@earendil-works/pi-ai/dist/api/anthropic-messages.js": {
-          "after": "149ea5f4a6e7d671ddca33fde74e323563ec65121fe36ff8baf5a4216d94be37",
-          "before": "f5bc66423ea13d733d5aa8e6985bcfad0beed93503ad8082de5a145d7b733574"
-        }
-      }
+      "0.2.2-rc.2": false,
+      "0.2.2-rc.3": false
     },
     "piai-discovery-response-cancel.diff": {
       "0.2.2-rc.1": {
@@ -168,12 +164,8 @@
           "before": "df81627c173163d0b918692f4a3b87e22cbdb5883b809e4d70d6152d1e68d948"
         }
       },
-      "0.2.2-rc.2": {
-        "node_modules/@earendil-works/pi-ai/dist/api/openai-completions.js": {
-          "after": "d98d1711a68dc5a4648f866655e870c2ab01e63969881bebc8f3a4e393222a21",
-          "before": "3221deb8b506eab9722d27694fc1bceb752d8786180999add590c2489ac91846"
-        }
-      }
+      "0.2.2-rc.2": false,
+      "0.2.2-rc.3": false
     },
     "plugin-manager-active-run-guard.diff": {
       "0.2.1-rc.4": {
