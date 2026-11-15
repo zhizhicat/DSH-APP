@@ -2476,7 +2476,9 @@
           "after": "00e0f6f5fed9adaeb78000cd0f00ae37037c48a88d441586be936b142178d343",
           "before": "a1ad048cbbb7caefe5471c583f076aa8e393f534efbc5b11b625308096efdace"
         }
-      }
+      },
+      "0.2.2-rc.2": false,
+      "0.2.2-rc.3": false
     }
   },
   "schema": 1
