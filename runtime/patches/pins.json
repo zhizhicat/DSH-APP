@@ -22,7 +22,9 @@
           "after": "b8b87360ebc67df2d0aabea214b8ed30d4bde3767e354ebb1b85fc6c15b45a05",
           "before": "627409afa06a265f7253200d3bc4648e88805c39fd3768568eb9b9518a31fe8f"
         }
-      }
+      },
+      "0.2.2-rc.2": false,
+      "0.2.2-rc.3": false
     },
     "credentials-decimal-refs.diff": {
       "0.2.1-rc.4": {
@@ -36,7 +38,9 @@
           "after": "4c4c3af9ed5580d9b6105d8c1767a2a58e2e294b001e585032c2fd68b711dd9f",
           "before": "6b4926ef62bfeb95bc3d7687b85303d739a41e813fe05ac06de50111361da069"
         }
-      }
+      },
+      "0.2.2-rc.2": false,
+      "0.2.2-rc.3": false
     },
     "fs-create-exclusive.diff": {
       "0.2.1-rc.2": {
@@ -56,7 +60,9 @@
           "after": "ef9b20789c0575f5db1cbfbfe69062a8fbdbe3b7a65aca8b1b39aa54fcb5e9be",
           "before": "d6d3115d4584a236746929d654ede98a0bc365fa4247567ba110971657fd7f90"
         }
-      }
+      },
+      "0.2.2-rc.2": false,
+      "0.2.2-rc.3": false
     },
     "fs-create-link-denial.diff": {
       "0.2.2-rc.1": {
@@ -65,6 +71,9 @@
           "before": "d22c2ead8df5061e7f5b5633959152143e3bc871c42fff81d2ac14de07cbfb00"
         }
       }
+    },
+    "install-log-redaction-expected.diff": {
+      "0.2.2-rc.1": false
     },
     "install-log-redaction.diff": {
       "0.2.1-rc.4": {
@@ -78,7 +87,9 @@
           "after": "da9d664272068326529de7774909387499a0a1bc6d4e8e5219a43977ad1efcf1",
           "before": "6f0fdc6a6e4cd2bc9d969ba582636729ade450e415f0fc20bbef9da3f65823f3"
         }
-      }
+      },
+      "0.2.2-rc.2": false,
+      "0.2.2-rc.3": false
     },
     "jsonl-materialize-rename.diff": {
       "0.2.2-rc.1": {
@@ -102,7 +113,9 @@
           "after": "26430731ff87ce6cd3b7fa038784dbbffd7fcab072bdf70e4ef9132c2af6764b",
           "before": "992daf485e2d479ac1df3886019946d0bf512ef6517ec730ce4c7315f9472ecc"
         }
-      }
+      },
+      "0.2.2-rc.2": false,
+      "0.2.2-rc.3": false
     },
     "piai-discovery-response-cancel.diff": {
       "0.2.2-rc.1": {
@@ -118,7 +131,9 @@
           "after": "f10502eab12993c68c1f886e5de5d3aa707604f504660cb861fc1b45faffecaf",
           "before": "df81627c173163d0b918692f4a3b87e22cbdb5883b809e4d70d6152d1e68d948"
         }
-      }
+      },
+      "0.2.2-rc.2": false,
+      "0.2.2-rc.3": false
     },
     "plugin-manager-active-run-guard.diff": {
       "0.2.1-rc.4": {
@@ -146,7 +161,12 @@
           "after": "24571ea1c8abfc26a4ea817088f179842b3162f3a6660e5db9eb19a753b65e7e",
           "before": "272efa48be4bce0a75ce7fe06eabf1c7fb60ca0e68b0708945199e80a9893bea"
         }
-      }
+      },
+      "0.2.2-rc.2": false,
+      "0.2.2-rc.3": false
+    },
+    "plugin-manager-cancel-tree-expected.diff": {
+      "0.2.2-rc.1": false
     },
     "preset-legacy-delegation.diff": {
       "0.2.2-rc.1": {
@@ -154,7 +174,9 @@
           "after": "5c8452bdb9954acd98737297512a3d8cb8d4ea534ee6e6ea5c2050aba8cf08e9",
           "before": "23cd2dd62ac3b27522a2d377e14b5a93f80c2189e733937dcdd02b73a6d3d1da"
         }
-      }
+      },
+      "0.2.2-rc.2": false,
+      "0.2.2-rc.3": false
     },
     "provider-discovery-headers.diff": {
       "0.2.2-rc.1": {
@@ -195,6 +217,11 @@
           "before": "456d2f417065b73ea3308437c0c23cb12c895d371a6e669ec8610d032a5ff6e3"
         }
       }
+    },
+    "route-guard-expected.diff": {
+      "0.2.2-rc.1": false,
+      "0.2.2-rc.2": false,
+      "0.2.2-rc.3": false
     },
     "route-guard.diff": {
       "0.2.1-rc.2": {
@@ -266,7 +293,9 @@
           "after": "65ac662fd5f1552b1aa0048dc9bd054357a3aae4853d0ba21fe0870ed811c50c",
           "before": "30fce2347da124b1d37e5fe4d1c423cd9ace06daf31f2329ca91e1a6201b0b73"
         }
-      }
+      },
+      "0.2.2-rc.2": false,
+      "0.2.2-rc.3": false
     },
     "str-editor-view-prefix.diff": {
       "0.2.1-rc.4": {
@@ -296,7 +325,9 @@
           "after": "f67cd7cbcf2ac824887396acd68a4f6f159be5f4bd880cd6f0014da3edb6c673",
           "before": "9a37949cc76603ea3a965ce4d0d6ca65885de4a9808345c38748e595ac396378"
         }
-      }
+      },
+      "0.2.2-rc.2": false,
+      "0.2.2-rc.3": false
     },
     "z-plugin-install-log-utf8.diff": {
       "0.2.1-rc.4": {
@@ -426,7 +457,12 @@
           "after": "ee0876bbfa11c8d52dcdb663810d6a042c65274f1088bca3f6dd7b8446ed8e09",
           "before": "76b2f53517bc3312084bc062ce8bbc4111f3b723d96da080157046c2b6d4766a"
         }
-      }
+      },
+      "0.2.2-rc.2": false,
+      "0.2.2-rc.3": false
+    },
+    "zzz-config-editor-path-expected.diff": {
+      "0.2.2-rc.1": false
     },
     "zzz-config-editor-path.diff": {
       "0.2.1-rc.4": {
@@ -448,7 +484,9 @@
           "after": "db049a3c24343dc93dc36c7726a3760c9fd1bcaa2aa4b719e1fcbd1efb1a890d",
           "before": "17e953c5ef913d368b288e3d64e952276ea08a46967bfdd430534b69b9d0c039"
         }
-      }
+      },
+      "0.2.2-rc.2": false,
+      "0.2.2-rc.3": false
     },
     "zzz-fs-replace-all-count.diff": {
       "0.2.1-rc.4": {
@@ -500,7 +538,9 @@
           "after": "87fbd5fb2bbfa1efcf5692bdea985c150060b02f82dc4016a4b3b13fdcbbebd3",
           "before": "39e6857f984570267a96fc52c08c04e520b15c322336f6f95838554f6ce16dec"
         }
-      }
+      },
+      "0.2.2-rc.2": false,
+      "0.2.2-rc.3": false
     },
     "zzzz-plugin-config-readability.diff": {
       "0.2.1-rc.4": {

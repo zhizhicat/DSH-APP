@@ -386,6 +386,11 @@ def cmd_patch_dsh(args):
     for position, name in enumerate(names):
         diff = parse_unified_diff(open(os.path.join(args.patches, name)).read())
         want = pins["patches"].get(name, {}).get(args.dsh_version)
+        if want is False:
+            # Explicitly not applicable to this DSH version (upstream absorbed the
+            # change, or the patch targets a different pinned version's bytes).
+            print("%s: not applicable to DSH %s (pinned false)" % (name, args.dsh_version))
+            continue
         if want is None and not args.record:
             sys.exit("patch %s has no pin for DSH %s: review the upstream files it touches, then run\n"
                      "  python3 -I runtime/lib/rtbuild.py patch-dsh --prefix <dsh-prefix> --dsh-version %s --record"

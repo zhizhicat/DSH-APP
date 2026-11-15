@@ -1,14 +1,14 @@
 # One patch per line, in application order. Keep every .diff exactly once.
-cordis-effect-dispose-completion.diff
-credentials-decimal-refs.diff
-fs-create-exclusive.diff
 install-log-redaction.diff
+install-log-redaction-expected.diff
 piai-anthropic-opus55-thinking.diff
 piai-google-openai-store.diff
 plugin-manager-active-run-guard.diff
 plugin-manager-cancel-tree-confirmation.diff
+plugin-manager-cancel-tree-expected.diff
 preset-legacy-delegation.diff
 route-guard.diff
+route-guard-expected.diff
 schemastery-json-context.diff
 session-title-word-prefix.diff
 str-editor-view-prefix.diff
@@ -16,6 +16,7 @@ web-composer-mobile-newline.diff
 z-plugin-install-log-utf8.diff
 zz-direct-runtime.diff
 zzz-config-editor-path.diff
+zzz-config-editor-path-expected.diff
 zzz-fs-replace-all-count.diff
 zzz-title-cache-refresh.diff
 zzzz-plugin-config-readability.diff
