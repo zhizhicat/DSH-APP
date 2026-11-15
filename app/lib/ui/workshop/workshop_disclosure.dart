@@ -98,7 +98,7 @@ class WorkshopDisclosureView extends StatelessWidget {
         ListPageCard(
           children: [
             _Party(label: l10n.workshopDisclosureWorker, host: workshopHostText(offer.worker)),
-            _Party(label: l10n.workshopDisclosureForum, host: workshopHostText(offer.forum)),
+            _Party(label: l10n.workshopDisclosureAccount, host: workshopHostText(offer.forum)),
           ],
         ),
         Padding(
