@@ -25,7 +25,7 @@ import 'io/st_chat_document.dart';
 import 'io/tavern_backup.dart' as backup_io;
 import 'js_string.dart';
 import 'llm/model_client.dart';
-import 'llm/tool_calls.dart';
+import 'llm/tool_calls_snapshot.dart';
 import 'lorebook_library.dart';
 import 'macros/macro_engine.dart';
 import 'persona.dart';
