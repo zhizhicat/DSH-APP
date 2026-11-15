@@ -19,6 +19,10 @@ SDK_DIR="$DEV_ROOT/android-sdk"
 DL="$DEV_ROOT/.downloads"
 mkdir -p "$DEV_ROOT" "$DL"
 
+# Source choice: CN mirrors first (fast in CN), official upstream on GitHub runners —
+# CN CDNs throttle overseas clients at night (three stuck toolchain installs, 2026-11-15).
+ON_CI="${GITHUB_ACTIONS:-}"
+
 log() { printf '[toolchain %s] %s\n' "$(date +%H:%M:%S)" "$*"; }
 
 download_cached() (
@@ -34,12 +38,18 @@ download_cached() (
 
 install_jdk() {
   if [ -x "$JDK_DIR/bin/java" ] && [ ! -f "$JDK_DIR/.dsh-toolchain-incomplete" ]; then log "JDK present"; return; fi
-  local base="https://mirrors.tuna.tsinghua.edu.cn/Adoptium/17/jdk/x64/linux/"
   local name
-  name=$(curl -fsSL "$base" | grep -oE 'OpenJDK17U-jdk_x64_linux_hotspot_[0-9._]+\.tar\.gz' | sort -uV | tail -1)
-  [ -n "$name" ] || { log "could not find JDK tarball"; return 1; }
-  log "JDK: $name"
-  curl -fL --retry 3 -o "$DL/$name" "$base$name"
+  if [[ "$ON_CI" == "true" ]]; then
+    name="jdk17-adoptium-official.tar.gz"
+    log "JDK: official Adoptium API"
+    download_cached "$DL/$name" "https://api.adoptium.net/v3/binary/latest/17/ga/linux/x64/jdk/hotspot/normal/eclipse"
+  else
+    local base="https://mirrors.tuna.tsinghua.edu.cn/Adoptium/17/jdk/x64/linux/"
+    name=$(curl -fsSL "$base" | grep -oE 'OpenJDK17U-jdk_x64_linux_hotspot_[0-9._]+\.tar\.gz' | sort -uV | tail -1)
+    [ -n "$name" ] || { log "could not find JDK tarball"; return 1; }
+    log "JDK: $name"
+    download_cached "$DL/$name" "$base$name"
+  fi
   mkdir -p "$JDK_DIR"
   touch "$JDK_DIR/.dsh-toolchain-incomplete"
   tar -xzf "$DL/$name" -C "$JDK_DIR" --strip-components=1
@@ -50,7 +60,9 @@ install_jdk() {
 install_flutter() {
   if [ -x "$FLUTTER_DIR/bin/flutter" ] && [ ! -f "$FLUTTER_DIR/.dsh-toolchain-incomplete" ]; then log "Flutter present"; return; fi
   local name="flutter_linux_${FLUTTER_VERSION}-stable.tar.xz"
-  local url="https://storage.flutter-io.cn/flutter_infra_release/releases/stable/linux/$name"
+  local storage="https://storage.flutter-io.cn"
+  [[ "$ON_CI" != "true" ]] || storage="https://storage.googleapis.com"
+  local url="$storage/flutter_infra_release/releases/stable/linux/$name"
   log "Flutter: $name"
   download_cached "$DL/$name" "$url"
   echo "$FLUTTER_SHA256  $DL/$name" | sha256sum -c -
@@ -83,7 +95,9 @@ done
 export JAVA_HOME="$JDK_DIR"
 export ANDROID_HOME="$SDK_DIR" ANDROID_SDK_ROOT="$SDK_DIR"
 export PATH="$JDK_DIR/bin:$FLUTTER_DIR/bin:$SDK_DIR/cmdline-tools/latest/bin:$SDK_DIR/platform-tools:$SDK_DIR/emulator:$PATH"
-export PUB_HOSTED_URL="https://pub.flutter-io.cn" FLUTTER_STORAGE_BASE_URL="https://storage.flutter-io.cn"
+if [[ "$ON_CI" != "true" ]]; then
+  export PUB_HOSTED_URL="https://pub.flutter-io.cn" FLUTTER_STORAGE_BASE_URL="https://storage.flutter-io.cn"
+fi
 
 # Versions Flutter's Gradle plugin defaults to (compileSdk / NDK).
 GRADLE_EXT=$(find "$FLUTTER_DIR/packages/flutter_tools/gradle/src/main" -name 'FlutterExtension.*' -print -quit)
