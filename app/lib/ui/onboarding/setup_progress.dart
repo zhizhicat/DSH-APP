@@ -112,11 +112,7 @@ class RuntimeInstallController extends Notifier<bool> {
                 : sources.first.id;
             final index = await runtime.layersIndex(channel.id, sourceId);
             if (index != null) {
-              await installVariant(sourceId, LayersChoice(
-                base: index.base.first.key,
-                node: index.node.first.key,
-                engine: index.engine.first.key,
-              ));
+              await installVariant(sourceId, LayersChoice.defaultFor(index));
               return;
             }
           }

@@ -1,6 +1,7 @@
 package io.github.ccch1mneyyy.dsh_app.runtime
 
 import android.content.Context
+import java.io.File
 import org.json.JSONObject
 
 data class RuntimeArchive(
@@ -32,9 +33,36 @@ data class RuntimeManifest(
     companion object {
         const val ASSET_DIR = "runtime"
 
+        /** The downloaded channel's manifest, so a noruntime build can identify its
+         *  installed runtime after the app process is killed (else every cold start
+         *  looks like a fresh first run and re-downloads everything). */
+        private val CHANNEL_FILE = File(File(ASSET_DIR), "channel-manifest.json")
+
         fun load(context: Context): RuntimeManifest {
             val text = context.assets.open("$ASSET_DIR/manifest.json").bufferedReader().use { it.readText() }
             return fromJson(JSONObject(text))
+        }
+
+        /** Persists a downloaded channel manifest (atomic-ish: temp then rename). */
+        fun saveChannel(context: Context, manifest: RuntimeManifest) {
+            runCatching {
+                val dir = File(context.filesDir, ASSET_DIR)
+                dir.mkdirs()
+                val temp = File(dir, CHANNEL_FILE.name + ".tmp")
+                temp.writeText(manifest.raw.toString())
+                if (!temp.renameTo(CHANNEL_FILE)) {
+                    CHANNEL_FILE.writeText(manifest.raw.toString())
+                    temp.delete()
+                }
+            }
+        }
+
+        fun loadChannel(context: Context): RuntimeManifest? = runCatching {
+            fromJson(JSONObject(File(File(context.filesDir, ASSET_DIR), CHANNEL_FILE.name).readText()))
+        }.getOrNull()
+
+        fun clearChannel(context: Context) {
+            runCatching { File(File(context.filesDir, ASSET_DIR), CHANNEL_FILE.name).delete() }
         }
 
         internal fun fromJson(json: JSONObject): RuntimeManifest {

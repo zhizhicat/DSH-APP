@@ -142,6 +142,25 @@ class LocalRuntimeController extends Notifier<LocalRuntimeState> {
     );
   }
 
+  /// The layer defaults for a fresh install: Debian 12 for the base, Node 24
+  /// for the runtime, and the newest engine. Falls back to whatever sorts
+  /// first (the index is sorted newest-first) when a preference is missing.
+  static LayersChoice defaultFor(LayersIndex index) => LayersChoice(
+    base: _pick(index.base, (k) => k.contains('debian-12')) ??
+        _pick(index.base, (k) => k.contains('debian')) ??
+        index.base.first.key,
+    node: _pick(index.node, (k) => k.contains('24')) ?? index.node.first.key,
+    engine: index.engine.first.key,
+  );
+
+  /// The newest variant whose key matches [test], or null.
+  static LayerVariant? _pick(List<LayerVariant> variants, bool Function(String) test) {
+    for (final v in variants) {
+      if (test(v.key)) return v;
+    }
+    return null;
+  }
+
   /// Remembers the person's last mirror + layer selection for next installs.
   static Future<void> saveVariantPrefs({
     required String sourceId,

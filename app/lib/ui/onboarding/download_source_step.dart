@@ -123,10 +123,19 @@ class _DownloadSourceStepPageState extends ConsumerState<DownloadSourceStepPage>
         _choice = null;
       } else {
         _indexError = null;
-        _choice = _validChoice(preferred, index) ??
-            LayersChoice(base: index.base.first.key, node: index.node.first.key, engine: index.engine.first.key);
+        _choice = _validChoice(preferred, index) ?? LayersChoice.defaultFor(index);
       }
     });
+  }
+
+  /// Applies a layer pick and remembers it right away, so leaving mid-download
+  /// still resumes into the same selection (the download itself caches too).
+  void _pick(LayersChoice choice) {
+    setState(() => _choice = choice);
+    final sourceId = _sourceId;
+    if (sourceId != null) {
+      unawaited(LocalRuntimeController.saveVariantPrefs(sourceId: sourceId, choice: choice));
+    }
   }
 
   LayersChoice? _validChoice(LayersChoice? preferred, LayersIndex index) {
@@ -198,19 +207,19 @@ class _DownloadSourceStepPageState extends ConsumerState<DownloadSourceStepPage>
                 label: l10n.setupSourceRootfs,
                 variants: _index!.base,
                 selectedKey: _choice!.base,
-                onChanged: (k) => setState(() => _choice = LayersChoice(base: k, node: _choice!.node, engine: _choice!.engine)),
+                onChanged: (k) => _pick(LayersChoice(base: k, node: _choice!.node, engine: _choice!.engine)),
               ),
               _VariantRow(
                 label: l10n.setupSourceNode,
                 variants: _index!.node,
                 selectedKey: _choice!.node,
-                onChanged: (k) => setState(() => _choice = LayersChoice(base: _choice!.base, node: k, engine: _choice!.engine)),
+                onChanged: (k) => _pick(LayersChoice(base: _choice!.base, node: k, engine: _choice!.engine)),
               ),
               _VariantRow(
                 label: l10n.setupSourceDsh,
                 variants: _index!.engine,
                 selectedKey: _choice!.engine,
-                onChanged: (k) => setState(() => _choice = LayersChoice(base: _choice!.base, node: _choice!.node, engine: k)),
+                onChanged: (k) => _pick(LayersChoice(base: _choice!.base, node: _choice!.node, engine: k)),
               ),
             ],
           ),

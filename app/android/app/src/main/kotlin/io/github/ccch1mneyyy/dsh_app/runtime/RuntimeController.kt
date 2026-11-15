@@ -60,18 +60,29 @@ class RuntimeController private constructor(private val app: Context) : DshProce
     /** Set once a channel's manifest has been fetched; takes precedence over the bundle. */
     @Volatile private var channelManifest: RuntimeManifest? = null
 
+    /** The last successfully installed channel's manifest, read back from disk on
+     *  a noruntime cold start so the app can tell "already installed" apart from
+     *  "fresh download". */
+    private val persistedManifest: RuntimeManifest? by lazy {
+        if (bundledManifest == null) RuntimeManifest.loadChannel(app) else null
+    }
+
     val manifest: RuntimeManifest
-        get() = channelManifest ?: bundledManifest
+        get() = channelManifest ?: bundledManifest ?: persistedManifest
         ?: throw IOException("no runtime manifest: bundle absent, download a runtime channel first")
 
     private val bundledInstaller: RuntimeInstaller? by lazy {
         bundledManifest?.let { RuntimeInstaller(app, it, ::note) }
     }
 
+    private val persistedInstaller: RuntimeInstaller? by lazy {
+        persistedManifest?.let { RuntimeInstaller(app, it, ::note) }
+    }
+
     @Volatile private var channelInstaller: RuntimeInstaller? = null
 
     private val installer: RuntimeInstaller
-        get() = channelInstaller ?: bundledInstaller
+        get() = channelInstaller ?: bundledInstaller ?: persistedInstaller
         ?: throw IOException("runtime unavailable: bundle absent, download a runtime channel first")
     @Volatile private var process: DshProcess? = null
     @Volatile private var lastLaunch: LaunchDiagnostics? = null
@@ -319,6 +330,7 @@ class RuntimeController private constructor(private val app: Context) : DshProce
                 ).file
                 val m = RuntimeManifest.fromJson(JSONObject(manifestFile.readText()))
                 synchronized(this) { channelManifest = m }
+                RuntimeManifest.saveChannel(app, m)
                 val inst = RuntimeInstaller(app, m, ::note, source = FileArchiveSource(downloads))
                     .also { channelInstaller = it }
                 log("[dsh-app] channel ${channel.id}: downloading ${m.archives.size} archive(s) " +
@@ -387,6 +399,7 @@ class RuntimeController private constructor(private val app: Context) : DshProce
                 val m = RuntimeManifest.fromJson(
                     LayerChannels.buildManifest(index, "arm64-v8a", baseKey, nodeKey, engineKey))
                 synchronized(this) { channelManifest = m }
+                RuntimeManifest.saveChannel(app, m)
                 val inst = RuntimeInstaller(app, m, ::note, source = FileArchiveSource(downloads))
                     .also { channelInstaller = it }
                 // Hot engine upgrade: when the active rootfs already matches the
@@ -836,6 +849,9 @@ class RuntimeController private constructor(private val app: Context) : DshProce
                 try {
                     check(runtimeLogs.pauseDisk()) { "log reset pause timed out" }
                     installer.reset(keep.flatMap { it.paths })
+                    RuntimeManifest.clearChannel(app)
+                    channelManifest = null
+                    channelInstaller = null
                 } finally {
                     runtimeLogs.resumeDisk()
                 }
