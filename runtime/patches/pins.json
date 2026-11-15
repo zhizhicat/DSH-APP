@@ -264,7 +264,9 @@
           "after": "29ea5d2268eee5da763bd324be45b661bd5bb0b41b78d76a44b902a231ce9510",
           "before": "456d2f417065b73ea3308437c0c23cb12c895d371a6e669ec8610d032a5ff6e3"
         }
-      }
+      },
+      "0.2.2-rc.2": false,
+      "0.2.2-rc.3": false
     },
     "route-guard-expected.diff": {
       "0.2.2-rc.1": false,
@@ -335,7 +337,9 @@
           "after": "8c9aa37cb3b8884d3da84c9d2e7216be3ea0e0aca91671b728d12e3c3220e8cb",
           "before": "7c48bc2b02595c987149f0187239a2599eccbc73f876fe30c722495a8ad36523"
         }
-      }
+      },
+      "0.2.2-rc.2": false,
+      "0.2.2-rc.3": false
     },
     "session-queue-steer-deletion.diff": {
       "0.2.2-rc.1": {
@@ -343,7 +347,9 @@
           "after": "3b24a3b02a80a859bc3cae31e081cee2a2e16d152d19f70bfd9fe4d981e0a790",
           "before": "8c9aa37cb3b8884d3da84c9d2e7216be3ea0e0aca91671b728d12e3c3220e8cb"
         }
-      }
+      },
+      "0.2.2-rc.2": false,
+      "0.2.2-rc.3": false
     },
     "session-title-word-prefix.diff": {
       "0.2.1-rc.4": {
@@ -391,7 +397,9 @@
           "after": "64c970e2ad8e78b09aee7b377ca18320d696be8c98bff3069660224ef5bbb3cd",
           "before": "65e58b624d4ab5d0bc8416faa3de664b2fdc34c600f5ee94e29e6f4e5bd08fbe"
         }
-      }
+      },
+      "0.2.2-rc.2": false,
+      "0.2.2-rc.3": false
     },
     "web-composer-mobile-newline.diff": {
       "0.2.2-rc.1": {
