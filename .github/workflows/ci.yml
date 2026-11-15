@@ -228,7 +228,13 @@ jobs:
           version=$(sed -nE 's/^DSH_VERSION="\$\{DSH_VERSION:-(.+)\}"$/\1/p' runtime/build-runtime.sh)
           if [ -z "$version" ]; then
             # DSH_VERSION unpinned = pull upstream latest (same rule as the layers build)
-            version=$(npm view @deepseek-ai/dsh version --registry https://registry.npmmirror.com)
+            if [ "$RUNNER_ENVIRONMENT" = "github-hosted" ]; then
+              # GitHub runners sit close to the official registry; the CN mirror's
+              # dist-tags lag behind and have already desynced version detection once.
+              version=$(npm view @deepseek-ai/dsh version --registry https://registry.npmjs.org)
+            else
+              version=$(npm view @deepseek-ai/dsh version --registry https://registry.npmmirror.com)
+            fi
           fi
           prefix="$RUNNER_TEMP/dsh"
           mkdir "$prefix"
