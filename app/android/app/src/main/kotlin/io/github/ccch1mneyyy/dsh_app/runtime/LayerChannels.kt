@@ -45,7 +45,10 @@ internal object LayerChannels {
         val url = source.prefix + channel.githubBase + channel.indexPath
         val file = File(downloads, "layers-index.json")
         try {
-            downloader.download(url, file, channel.indexSha256)
+            // force: the index is small and freshness-sensitive; without a pinned sha
+            // the "exists = cache hit" rule would stick the app to whatever index it
+            // first fetched (stale engine metadata labeled a fresh install rc.1).
+            downloader.download(url, file, channel.indexSha256, force = true)
         } catch (e: IOException) {
             val cause = e.cause?.let { "${it::class.simpleName}: ${it.message}" } ?: ""
             throw IOException(
@@ -84,11 +87,15 @@ internal object LayerChannels {
 
         val manifest = JSONObject()
         manifest.put("schema", 2)
-        // The real build version string (matches etc/dsh-app/runtime.json inside the rootfs);
-        // falls back to the composed form only for older indexes that lack it.
-        manifest.put("runtimeVersion", base.optString("runtimeVersion", "layers-dsh$engineKey-node$nodeKey-base$baseKey"))
+        // runtimeVersion must describe THIS combination. base.runtimeVersion is the
+        // snapshot from the moment the base layer was built (the base is shared across
+        // engine/node choices), so trusting it mislabels every non-default combination —
+        // the installed manifest claimed dsh rc.1/node 24.9.0 while rc.2/24.22.1 was
+        // actually downloaded and running.
+        manifest.put("runtimeVersion", "layers-dsh$engineKey-node$nodeKey-base$baseKey")
         manifest.put("abi", abi)
-        manifest.put("dshVersion", abiInfo.optString("dshVersion", engineKey))
+        // dshVersion is the version the person picked, not the ABI-wide default snapshot.
+        manifest.put("dshVersion", engineKey)
         manifest.put("nodeVersion", nodeKey)
         manifest.put("pnpmVersion", abiInfo.optString("pnpmVersion"))
         manifest.put("ubuntuVersion", baseKey)

@@ -28,19 +28,21 @@ internal class RuntimeDownloader(
 ) {
     data class Result(val file: File, val sha256: String)
 
-    /** @param expectedSha256 lowercase hex, or null to skip the digest check. */
+    /** @param expectedSha256 lowercase hex, or null to skip the digest check.
+     *  @param force re-fetch even when a finished local artifact would otherwise cache-hit. */
     fun download(
         url: String,
         outFile: File,
         expectedSha256: String? = null,
         expectedBytes: Long = -1L,
         onProgress: (read: Long, total: Long) -> Unit = { _, _ -> },
+        force: Boolean = false,
     ): Result {
         outFile.parentFile?.mkdirs()
         val part = File(outFile.parentFile, outFile.name + ".part")
         // A finished artifact from an earlier pass (same size, same sha) is a hit:
         // skip the network entirely.
-        val cachedSha = if (outFile.isFile &&
+        val cachedSha = if (!force && outFile.isFile &&
             (expectedBytes < 0 || outFile.length() == expectedBytes)) sha256Of(outFile) else null
         if (cachedSha != null &&
             (expectedSha256 == null || expectedSha256.equals(cachedSha, ignoreCase = true))) {
