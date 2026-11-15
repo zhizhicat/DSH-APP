@@ -16594,6 +16594,13 @@ class L10nZh extends L10n {
   @override
   String get setupSourceDsh => 'DSH';
 
+  String get setupSourcePureBadge => '纯净版';
+  String get setupSourcePatchedBadge => '已适配';
+  String get setupPureTitle => '安装纯净版 DSH？';
+  String get setupPureBody => '这个引擎版本直接来自 npm 上游，没有经过我们的适配：安卓环境修复（编码、硬链接等）、手机操控通道、安全与数据修复都不在其中。功能基本可用，但部分能力缺失，遇到问题可随时切回已适配版本。';
+  String get setupPureConfirm => '继续安装';
+  String get setupPureCancel => '换回适配版';
+
   @override
   String get shellApiKeyPrefixWarning => 'DeepSeek 的 Key 通常以 sk- 开头，确认没有复制错';
 

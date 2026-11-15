@@ -30380,6 +30380,42 @@ abstract class L10n {
   /// **'DSH'**
   String get setupSourceDsh;
 
+  /// No description provided for @setupSourcePureBadge.
+  ///
+  /// In zh, this message translates to:
+  /// **'纯净版'**
+  String get setupSourcePureBadge;
+
+  /// No description provided for @setupSourcePatchedBadge.
+  ///
+  /// In zh, this message translates to:
+  /// **'已适配'**
+  String get setupSourcePatchedBadge;
+
+  /// No description provided for @setupPureTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'安装纯净版 DSH？'**
+  String get setupPureTitle;
+
+  /// No description provided for @setupPureBody.
+  ///
+  /// In zh, this message translates to:
+  /// **'…'**
+  String get setupPureBody;
+
+  /// No description provided for @setupPureConfirm.
+  ///
+  /// In zh, this message translates to:
+  /// **'继续安装'**
+  String get setupPureConfirm;
+
+  /// No description provided for @setupPureCancel.
+  ///
+  /// In zh, this message translates to:
+  /// **'换回适配版'**
+  String get setupPureCancel;
+
   /// No description provided for @shellApiKeyPrefixWarning.
   ///
   /// In zh, this message translates to:

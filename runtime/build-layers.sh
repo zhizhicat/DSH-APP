@@ -48,8 +48,8 @@ export JNILIBS_RESTORE_DIR="$restore_dir"
 # DSH pin: empty = resolve the latest published version from the npm registry.
 if [[ -z "$DSH_VERSION" ]]; then
   bin="$(host_npm)"
-  DSH_VERSION="$(PATH="$bin:$PATH" npm view @deepseek-ai/dsh version --registry "$NPM_REGISTRY" 2>/dev/null)" \
-    || die "cannot resolve @deepseek-ai/dsh latest version from $NPM_REGISTRY"
+  DSH_VERSION="$(npm_run view @deepseek-ai/dsh version 2>/dev/null)" \
+    || die "cannot resolve @deepseek-ai/dsh latest from any registry in: $NPM_REGISTRIES"
   [[ "$DSH_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.]+)?$ ]] || die "npm returned a suspicious DSH version: $DSH_VERSION"
   log "DSH unpinned: resolved upstream latest @deepseek-ai/dsh@$DSH_VERSION"
 fi

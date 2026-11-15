@@ -17475,6 +17475,13 @@ class L10nEn extends L10n {
   @override
   String get setupSourceDsh => 'DSH';
 
+  String get setupSourcePureBadge => 'Pure';
+  String get setupSourcePatchedBadge => 'Adapted';
+  String get setupPureTitle => 'Install the pure DSH build?';
+  String get setupPureBody => 'This engine version comes straight from the npm upstream without our adaptations: Android environment fixes (encoding, hard links…), the phone control channel, and security/data fixes are absent. It mostly works, some capabilities are missing, and you can switch back to an adapted version anytime.';
+  String get setupPureConfirm => 'Continue';
+  String get setupPureCancel => 'Switch back';
+
   @override
   String get shellApiKeyPrefixWarning => 'DeepSeek keys usually start with sk-. Check you copied the right key.';
 

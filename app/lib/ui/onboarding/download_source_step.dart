@@ -138,6 +138,36 @@ class _DownloadSourceStepPageState extends ConsumerState<DownloadSourceStepPage>
     }
   }
 
+  /// Engine pick with a pure-build heads-up: -pure layers are unpatched
+  /// upstream builds (no Android fixes / phone channel / security patches).
+  void _pickEngine(String key) {
+    final previous = _choice;
+    _pick(LayersChoice(base: _choice!.base, node: _choice!.node, engine: key));
+    if (!key.endsWith('-pure')) return;
+    final l10n = context.l10n;
+    unawaited(showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(l10n.setupPureTitle),
+        content: Text(l10n.setupPureBody),
+        actions: [
+          TextButton(
+            // Back to the adapted build: restores the previous engine pick.
+            onPressed: () {
+              Navigator.of(dialogContext).pop();
+              if (previous != null && previous.engine != key) _pick(previous);
+            },
+            child: Text(l10n.setupPureCancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: Text(l10n.setupPureConfirm),
+          ),
+        ],
+      ),
+    ));
+  }
+
   LayersChoice? _validChoice(LayersChoice? preferred, LayersIndex index) {
     if (preferred == null) return null;
     if (!index.base.any((v) => v.key == preferred.base)) return null;
@@ -219,7 +249,7 @@ class _DownloadSourceStepPageState extends ConsumerState<DownloadSourceStepPage>
                 label: l10n.setupSourceDsh,
                 variants: _index!.engine,
                 selectedKey: _choice!.engine,
-                onChanged: (k) => _pick(LayersChoice(base: _choice!.base, node: _choice!.node, engine: k)),
+                onChanged: (k) => _pickEngine(k),
               ),
             ],
           ),
@@ -289,20 +319,41 @@ class _VariantRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final selected = variants.firstWhere((v) => v.key == selectedKey, orElse: () => variants.first);
+    final l10n = context.l10n;
+    // -pure engine keys: strip the suffix for display and badge the row.
+    String shown(String key) => key.endsWith('-pure') ? key.substring(0, key.length - 5) : key;
+    Widget? badge(String key) => key.endsWith('-pure')
+        ? Text(l10n.setupSourcePureBadge,
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: Theme.of(context).colorScheme.tertiary))
+        : null;
     return ListTile(
       dense: true,
       title: Text(label),
-      subtitle: variants.length > 1 ? null : Text(selected.key, style: Theme.of(context).textTheme.bodySmall),
+      subtitle: variants.length > 1 ? null : Text(shown(selected.key), style: Theme.of(context).textTheme.bodySmall),
       trailing: variants.length > 1
           ? PopupMenuButton<String>(
               initialValue: selectedKey,
               onSelected: onChanged,
               itemBuilder: (context) => [
                 for (final v in variants)
-                  PopupMenuItem(value: v.key, child: Text(v.key)),
+                  PopupMenuItem(
+                    value: v.key,
+                    child: Row(mainAxisSize: MainAxisSize.min, children: [
+                      Text(shown(v.key)),
+                      if (badge(v.key) != null) ...[
+                        const SizedBox(width: 8),
+                        badge(v.key)!,
+                      ],
+                    ]),
+                  ),
               ],
               child: Row(mainAxisSize: MainAxisSize.min, children: [
-                Text(selected.key),
+                Text(shown(selected.key)),
+                if (badge(selectedKey) != null) ...[
+                  const SizedBox(width: 6),
+                  badge(selectedKey)!,
+                ],
                 const SizedBox(width: 4),
                 const Icon(AppIcons.expand, size: 18),
               ]),

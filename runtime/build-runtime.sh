@@ -72,11 +72,15 @@ XZ_THREADS="${XZ_THREADS:-4}"       # xz 5.8.1 -6, 136704-byte sample: -T1=408 B
 PRUNE_DEV_METADATA="${PRUNE_DEV_METADATA:-1}"   # drop *.map / *.d.ts from node_modules
 SOURCE_DATE_EPOCH="${SOURCE_DATE_EPOCH:-1767225600}"  # 2026-01-01T00:00:00Z, fixed tar mtimes
 
-UBUNTU_MIRROR="https://mirrors.tuna.tsinghua.edu.cn/ubuntu-cdimage/ubuntu-base/releases/${BASE_VER%.*}/release"  # ubuntu BASE only
-NODE_MIRROR="https://npmmirror.com/mirrors/node"
-NPM_REGISTRY="https://registry.npmmirror.com"
-TERMUX_REPO="https://packages.termux.dev/apt/termux-main"
-DEBIAN_LXC_MIRROR="https://mirrors.tuna.tsinghua.edu.cn/lxc-images/images/debian"  # debian BASE: <codename>/<arch>/default/<LXC_DATE>/rootfs.tar.xz
+# -- 分层镜像组（空格分隔，逐个降级；env 覆盖可换序/换源。首源=GitHub runner 最快的官方，国内源作降级与本地构建首选）
+UBUNTU_CDIMAGE_MIRRORS="${UBUNTU_CDIMAGE_MIRRORS:-https://cdimage.ubuntu.com/ubuntu-base/releases https://mirrors.tuna.tsinghua.edu.cn/ubuntu-cdimage/ubuntu-base/releases https://mirrors.aliyun.com/ubuntu-cdimage/ubuntu-base/releases https://mirrors.huaweicloud.com/ubuntu-cdimage/ubuntu-base/releases}"
+UBUNTU_MIRROR="${UBUNTU_MIRROR:-https://mirrors.tuna.tsinghua.edu.cn/ubuntu-cdimage/ubuntu-base/releases/${BASE_VER%.*}/release}"  # legacy 单镜像覆盖（CI 兼容）
+NODE_MIRRORS="${NODE_MIRRORS:-https://nodejs.org/dist https://mirrors.tuna.tsinghua.edu.cn/nodejs-release https://mirrors.aliyun.com/nodejs-release https://mirrors.huaweicloud.com/nodejs https://npmmirror.com/mirrors/node}"
+NODE_MIRROR="${NODE_MIRROR:-https://npmmirror.com/mirrors/node}"
+NPM_REGISTRIES="${NPM_REGISTRIES:-https://registry.npmmirror.com https://mirrors.huaweicloud.com/repository/npm https://mirrors.cloud.tencent.com/npm https://registry.npmjs.org}"
+NPM_REGISTRY="${NPM_REGISTRY:-https://registry.npmmirror.com}"
+DEBIAN_LXC_MIRRORS="${DEBIAN_LXC_MIRRORS:-https://images.linuxcontainers.org/images/debian https://mirrors.tuna.tsinghua.edu.cn/lxc-images/images/debian https://mirrors.huaweicloud.com/linuxcontainers/images/debian https://mirrors.ustc.edu.cn/linuxcontainers/images/debian}"
+DEBIAN_LXC_MIRROR="${DEBIAN_LXC_MIRROR:-https://mirrors.tuna.tsinghua.edu.cn/lxc-images/images/debian}"  # debian BASE（legacy 单镜像覆盖）
 DEBIAN_ARCHIVE="https://mirrors.tuna.tsinghua.edu.cn/debian"                      # debian BASE: one pool serves both architectures
 DEBIAN_SECURITY="https://mirrors.tuna.tsinghua.edu.cn/debian-security"            # debian security updates live in a separate pool
 UBUNTU_ARCHIVE_AMD64="https://mirrors.tuna.tsinghua.edu.cn/ubuntu"        # InRelease verified with gpgv
@@ -135,7 +139,7 @@ fetch() {
   if [[ -n "$want" && -n "$RUNTIME_INPUT_STORE_URL" ]]; then
     retained="${RUNTIME_INPUT_STORE_URL%/}/sha256-$want"
   fi
-  for candidate in "$url" "${4:-}" "$retained"; do
+  for candidate in "$url" "${@:4}" "$retained"; do
     [[ -n "$candidate" ]] || continue
     log "download $candidate"
     if curl -fL --retry 3 --retry-delay 2 --connect-timeout 20 -sS -o "$dest.part" "$candidate"; then
@@ -178,7 +182,9 @@ debian_base() {  # LXC images rootfs; no upstream SHA256SUMS exists, so a PIN en
   local pin; pin="$(pin_of "$name")"
   [[ -n "$pin" ]] || die "no sha256 PIN for $name — lxc-images publishes no checksums; compute and add one"
   local codename; codename="$APT_CODENAME"
-  fetch "$DEBIAN_LXC_MIRROR/$codename/$arch/default/$LXC_DATE/rootfs.tar.xz" "$dir/$name" "$pin"
+  local -a lurls=()
+  for m in $DEBIAN_LXC_MIRRORS; do lurls+=("$m/$codename/$arch/default/$LXC_DATE/rootfs.tar.xz"); done
+  fetch "${lurls[0]}" "$dir/$name" "$pin" "${lurls[@]:1}"
   printf '%s' "$dir/$name"
 }
 
@@ -186,24 +192,28 @@ ubuntu_base() {  # $1 = ubuntu arch; echoes path
   local arch="$1" name="ubuntu-base-${UBUNTU_VERSION}-base-$1.tar.gz"
   local dir="$CACHE/ubuntu/$UBUNTU_VERSION"
   local pin; pin="$(pin_of "$name")"
+  local -a uurls=()
+  for m in $UBUNTU_CDIMAGE_MIRRORS; do uurls+=("$m/${UBUNTU_VERSION%.*}/release"); done
   if [[ -z "$pin" ]]; then
-    fetch "$UBUNTU_MIRROR/SHA256SUMS" "$dir/SHA256SUMS"
+    fetch "${uurls[0]}/SHA256SUMS" "$dir/SHA256SUMS" "${uurls[@]:1}"
     pin="$(awk -v f="$name" '{n=$2; sub(/^\*/,"",n); if (n==f) print $1}' "$dir/SHA256SUMS")"
     [[ -n "$pin" ]] || { rm -f "$dir/SHA256SUMS"; die "$name not listed in SHA256SUMS (stale cache removed, rerun)"; }
   fi
-  fetch "$UBUNTU_MIRROR/$name" "$dir/$name" "$pin"
+  fetch "${uurls[0]}/$name" "$dir/$name" "$pin" "${uurls[@]:1}"
   printf '%s' "$dir/$name"
 }
 
 node_dist() {  # $1 = node arch (arm64|x64); echoes path
   local name="node-v${NODE_VERSION}-linux-$1.tar.xz" dir="$CACHE/node/v$NODE_VERSION"
   local pin; pin="$(pin_of "$name")"
+  local -a nurls=()
+  for m in $NODE_MIRRORS; do nurls+=("$m/v$NODE_VERSION"); done
   if [[ -z "$pin" ]]; then
-    fetch "$NODE_MIRROR/v$NODE_VERSION/SHASUMS256.txt" "$dir/SHASUMS256.txt"
+    fetch "${nurls[0]}/SHASUMS256.txt" "$dir/SHASUMS256.txt" "${nurls[@]:1}"
     pin="$(awk -v f="$name" '$2==f {print $1}' "$dir/SHASUMS256.txt")"
     [[ -n "$pin" ]] || die "$name not listed in SHASUMS256.txt"
   fi
-  fetch "$NODE_MIRROR/v$NODE_VERSION/$name" "$dir/$name" "$pin"
+  fetch "${nurls[0]}/$name" "$dir/$name" "$pin" "${nurls[@]:1}"
   printf '%s' "$dir/$name"
 }
 
@@ -351,6 +361,16 @@ warm_npm_cache() {  # $1 = host npm bin dir, $2 = pinned lock; updates caller's 
   npm_flags+=(--offline)
 }
 
+npm_run() {  # npm with registry fallback: NPM_REGISTRIES 逐个降级，全部失败才退出非零
+  local bin; bin="$(host_npm)"
+  local reg
+  for reg in $NPM_REGISTRIES; do
+    if PATH="$bin:$PATH" npm "$@" --registry "$reg"; then return 0; fi
+    log "npm $1 via $reg failed — trying next registry"
+  done
+  return 1
+}
+
 install_dsh() {  # $1 = npm cpu, $2 = prefix dir
   local cpu="$1" prefix="$2" bin; bin="$(host_npm)"
   local lockdir="$LOCKS/dsh-$DSH_VERSION"
@@ -360,17 +380,17 @@ install_dsh() {  # $1 = npm cpu, $2 = prefix dir
     log "npm ci @deepseek-ai/dsh@$DSH_VERSION (cpu=$cpu, pinned lock)"
     cp "$lockdir/package.json" "$lockdir/package-lock.json" "$prefix/"
     warm_npm_cache "$bin" "$lockdir/package-lock.json"
-    PATH="$bin:$PATH" npm ci "${npm_flags[@]}"
+    npm_run ci "${npm_flags[@]}"
   else
     log "npm install @deepseek-ai/dsh@$DSH_VERSION (cpu=$cpu) — first run, will pin the lock"
-    PATH="$bin:$PATH" npm install "${npm_flags[@]}" --save-exact "@deepseek-ai/dsh@$DSH_VERSION"
+    npm_run install "${npm_flags[@]}" --save-exact "@deepseek-ai/dsh@$DSH_VERSION"
     # npm nests an exact-pinned dependency in every dependent when another version wins the top
     # level (0.2.1-rc.2: 50 copies of zod 4.4.3, ~26k files). Pin those as direct dependencies so
     # one copy is hoisted, then reinstall.
     local -a hoist=(); mapfile -t hoist < <("${PY[@]}" hoist-candidates "$prefix/package-lock.json")
     if [[ ${#hoist[@]} -gt 0 ]]; then
       log "hoisting duplicated exact dependencies: ${hoist[*]}"
-      PATH="$bin:$PATH" npm install "${npm_flags[@]}" --save-exact "@deepseek-ai/dsh@$DSH_VERSION" "${hoist[@]}"
+      npm_run install "${npm_flags[@]}" --save-exact "@deepseek-ai/dsh@$DSH_VERSION" "${hoist[@]}"
     fi
     mkdir -p "$lockdir"
     cp "$prefix/package.json" "$prefix/package-lock.json" "$lockdir/"
