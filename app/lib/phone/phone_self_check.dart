@@ -17,7 +17,7 @@ const phoneSelfCheckProfiles = <String>['probe_b', 'target_c1', 'target_c2'];
 const _probeCovered = {'device', 'channel', 'display', 'input_probe', 'cleanup'};
 const _targetCovered = {'device', 'channel', 'display', 'launch', 'tree', 'tap', 'cleanup'};
 const _targetC2Covered = {..._targetCovered, 'text_ascii', 'text_zh', 'capture', 'continuity'};
-const _runStates = {'idle', 'running', 'cleaning', 'done', 'cancelled'};
+const _runStates = {'idle', 'running', 'cleaning', 'done', 'cancelled', 'cleanup_pending'};
 const _stepStates = {'not_run', 'running', 'pass', 'fail', 'skipped', 'unknown', 'cancelled'};
 const _reasons = {
   'busy', 'unavailable', 'unsupported', 'cancelled', 'retired', 'phoneDisabled', 'locked',
@@ -134,7 +134,7 @@ class PhoneSelfCheckSnapshot {
   final String? reason;
   final List<PhoneSelfCheckStep> steps;
   bool get active => state == 'running' || state == 'cleaning';
-  bool get holdsResource => active;
+  bool get holdsResource => active || state == 'cleanup_pending';
 
   static PhoneSelfCheckSnapshot parse(Object? value) {
     if (value is! Map || value['v'] is! int || value['v'] != 1 || value['accepted'] is! bool ||
@@ -158,7 +158,7 @@ class PhoneSelfCheckSnapshot {
     final handle = rawHandle is String && rawHandle.isNotEmpty && rawHandle.length <= 256 &&
         utf8.encode(rawHandle).length <= 256 ? rawHandle : null;
     final state = value['state'] as String;
-    if (rawHandle != null && handle == null || (state == 'running' || state == 'cleaning') && handle == null) {
+    if (rawHandle != null && handle == null || const {'running', 'cleaning', 'cleanup_pending'}.contains(state) && handle == null) {
       return PhoneSelfCheckSnapshot.unavailable();
     }
     return PhoneSelfCheckSnapshot._(available: true, accepted: value['accepted'] as bool,
@@ -177,6 +177,7 @@ class PhoneSelfCheckChannel {
     return _invoke('startPhoneSelfCheck', {'v': 1, if (profile != 'probe_b') 'profile': profile});
   }
   Future<PhoneSelfCheckSnapshot> cancel(String handle) => _invoke('cancelPhoneSelfCheck', {'v': 1, 'runHandle': handle});
+  Future<PhoneSelfCheckSnapshot> retry(String handle) => _invoke('retryPhoneSelfCheckCleanup', {'v': 1, 'runHandle': handle});
   Future<PhoneSelfCheckSnapshot> _invoke(String method, [Map<String, Object?>? args]) async {
     try { return PhoneSelfCheckSnapshot.parse(await channel.invokeMethod<Object?>(method, args)); }
     on MissingPluginException { return PhoneSelfCheckSnapshot.unavailable(); }
@@ -199,6 +200,7 @@ class PhoneSelfCheckController extends ChangeNotifier {
   Timer? _timer;
   bool get canStart => !_disposed && snapshot.available && !commandPending && !_uncertain && !snapshot.holdsResource;
   bool get canCancel => !_disposed && !commandPending && snapshot.active && snapshot.runHandle != null;
+  bool get canRetry => !_disposed && !commandPending && snapshot.state == 'cleanup_pending' && snapshot.runHandle != null;
 
   void setVisible(bool value) {
     _visible = value;
@@ -228,6 +230,10 @@ class PhoneSelfCheckController extends ChangeNotifier {
   Future<void> cancel() async {
     final handle = snapshot.runHandle;
     if (canCancel && handle != null) await _command(() => channel.cancel(handle));
+  }
+  Future<void> retry() async {
+    final handle = snapshot.runHandle;
+    if (canRetry && handle != null) await _command(() => channel.retry(handle));
   }
 
   Future<void> _command(Future<PhoneSelfCheckSnapshot> Function() send) async {

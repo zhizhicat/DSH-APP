@@ -92,8 +92,8 @@ class WorkshopSubmissionsController extends Notifier<WorkshopSubmissionsState> {
   }
 
   void _owner(WorkshopSubmission item, WorkshopAuthorization authorization) {
-    if (item.ownerOrigin != authorization.credential.account ||
-        authorization.accountId != null && item.ownerId != authorization.accountId) {
+    if (item.ownerOrigin != authorization.credential.forum ||
+        authorization.forumUserId != null && item.ownerId != authorization.forumUserId) {
       workshopInvalid();
     }
   }
@@ -173,9 +173,7 @@ class WorkshopSubmissionsController extends Notifier<WorkshopSubmissionsState> {
         detailError: detailId != null && rows.containsKey(detailId) ? null : state.detailError);
     } on Object catch (error) {
       if (_current(session)) {
-        final failure = workshopTransportError(error);
-        state = state.copyWith(error: failure);
-        workshopForgetRefusedAccount(ref, failure);
+        state = state.copyWith(error: workshopTransportError(error));
       }
     } finally {
       if (_current(session)) {
@@ -217,9 +215,7 @@ class WorkshopSubmissionsController extends Notifier<WorkshopSubmissionsState> {
       }
     } on Object catch (error) {
       if (_current(session)) {
-        final failure = workshopTransportError(error);
-        state = state.copyWith(detailError: failure);
-        workshopForgetRefusedAccount(ref, failure);
+        state = state.copyWith(detailError: workshopTransportError(error));
       }
     } finally {
       if (_current(session)) {
@@ -279,7 +275,6 @@ class WorkshopSubmissionsController extends Notifier<WorkshopSubmissionsState> {
         state = state.copyWith(withdrawal: WorkshopWithdrawalState(
           phase: failure.resultUnknown ? WorkshopWithdrawalPhase.unknown : WorkshopWithdrawalPhase.failed,
           submissionId: id, error: failure));
-        workshopForgetRefusedAccount(ref, failure);
       }
     } finally {
       if (_current(session)) {

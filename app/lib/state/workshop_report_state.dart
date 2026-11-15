@@ -97,7 +97,6 @@ class WorkshopReportController extends Notifier<WorkshopReportState> {
         state = WorkshopReportState(session: session,
           phase: failure.resultUnknown ? WorkshopReportPhase.unknown : WorkshopReportPhase.failed,
           attempt: attempt, error: failure);
-        workshopForgetRefusedAccount(ref, failure);
       }
     }
     return true;
