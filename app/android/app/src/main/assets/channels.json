@@ -4,24 +4,29 @@
   "sources": [
     {
       "id": "ghfast",
-      "name": "ghfast.top · 国内加速",
+      "name": "ghfast.top \u00b7 \u56fd\u5185\u52a0\u901f",
       "prefix": "https://ghfast.top/"
     },
     {
       "id": "ghproxy",
-      "name": "gh-proxy.com · 国内加速",
+      "name": "gh-proxy.com \u00b7 \u56fd\u5185\u52a0\u901f",
       "prefix": "https://gh-proxy.com/"
     },
     {
+      "id": "ghproxyorg",
+      "name": "gh-proxy.org \u00b7 \u56fd\u5185\u52a0\u901f",
+      "prefix": "https://gh-proxy.org/"
+    },
+    {
       "id": "github",
-      "name": "GitHub 直连",
+      "name": "GitHub \u76f4\u8fde",
       "prefix": ""
     }
   ],
   "channels": [
     {
       "id": "dsh-go-layers",
-      "name": "官方运行时 · 分层可选（底座 / Node / DSH）",
+      "name": "\u5b98\u65b9\u8fd0\u884c\u65f6 \u00b7 \u5206\u5c42\u53ef\u9009\uff08\u5e95\u5ea7 / Node / DSH\uff09",
       "githubBase": "https://github.com/zhizhicat/DSH-APP/releases/download/runtime-layers/",
       "index": {
         "path": "layers-index.json"
@@ -29,7 +34,7 @@
     },
     {
       "id": "dsh-go-r15",
-      "name": "官方运行时 r15 · Ubuntu 24.04.5 · Node 24.22.1 · DSH 0.2.2-rc.1",
+      "name": "\u5b98\u65b9\u8fd0\u884c\u65f6 r15 \u00b7 Ubuntu 24.04.5 \u00b7 Node 24.22.1 \u00b7 DSH 0.2.2-rc.1",
       "manifest": {
         "url": "https://ghfast.top/https://github.com/zhizhicat/DSH-APP/releases/download/runtime-r15/manifest.json",
         "sha256": "89c496c02f1e26ac84dc540e9b083b4aa54d09dd1a7e07f01ebd4be055b9feb1"
