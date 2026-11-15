@@ -2,7 +2,10 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:dsh_app/state/workshop_account_state.dart';
+import 'package:dsh_app/forum/discourse_client.dart';
+import 'package:dsh_app/forum/forum_auth.dart';
+import 'package:dsh_app/forum/forum_models.dart';
+import 'package:dsh_app/forum/forum_state.dart';
 import 'package:dsh_app/state/workshop_auth_state.dart';
 import 'package:dsh_app/state/workshop_dependencies.dart';
 import 'package:dsh_app/state/workshop_preferences.dart';
@@ -14,55 +17,48 @@ import 'package:flutter_test/flutter_test.dart';
 import '../workshop/support.dart' show FakeWorkshopHttp, workshopCaps;
 
 final authWorker = Uri.parse('https://workshop.example');
-final authAccount = Uri.parse('https://github.com');
+final authForum = Uri.parse('https://forum.example');
 
 Matcher authError(String code) => throwsA(isA<WorkshopException>().having((error) => error.code, 'code', code));
 
-const authSignedOut = WorkshopAccountState(phase: WorkshopAccountPhase.signedOut);
-
-WorkshopAccountState authSignedIn({WorkshopAccountCredential? credential, int? userId = 42}) => WorkshopAccountState(
-  phase: WorkshopAccountPhase.signedIn,
-  credential: credential ?? const WorkshopAccountCredential('TEST_ONLY_KEY_A'),
-  id: userId, login: userId == null ? null : 'test-user',
+ForumAuthState authSignedIn({ForumCredentials? credentials, int? userId = 42}) => ForumAuthState(
+  phase: ForumAuthPhase.signedIn,
+  credentials: credentials ?? const ForumCredentials(key: 'TEST_ONLY_KEY_A', clientId: 'test-client'),
+  user: userId == null ? null : ForumCurrentUser(id: userId, username: 'test-user'),
 );
 
-/// Holds a fixed account state instead of reading secure storage or GitHub.
-class AuthAccountController extends WorkshopAccountController {
-  AuthAccountController(this.initial);
-  final WorkshopAccountState initial;
-  int signInStarts = 0, invalidated = 0;
+class AuthForumController extends ForumAuthController {
+  AuthForumController(this.initial);
+  final ForumAuthState initial;
   @override
-  WorkshopAccountState build() => initial;
-  void emit(WorkshopAccountState value) => state = value;
+  ForumAuthState build() => initial;
+  void emit(ForumAuthState value) => state = value;
+}
+
+class AuthBaseController extends ForumBaseUrlController {
+  AuthBaseController(this.initial);
+  final String initial;
   @override
-  Future<void> startSignIn() async {
-    signInStarts++;
-    state = WorkshopAccountState(phase: WorkshopAccountPhase.awaitingCode, userCode: 'TEST-CODE',
-      verificationUri: Uri.parse('https://github.com/login/device'), expiresAt: DateTime.utc(2030));
-  }
-  @override
-  Future<void> markInvalid() async {
-    invalidated++;
-    state = authSignedOut;
-  }
+  String build() => initial;
+  void select(Uri value) => state = value.toString();
 }
 
 class AuthPreferences implements WorkshopPreferences {
   final accepted = <String>{};
   int writes = 0;
-  Future<bool> Function(Uri worker, Uri account)? readDisclosure;
-  Future<void> Function(Uri worker, Uri account)? writeDisclosure;
-  String pair(Uri worker, Uri account) => jsonEncode([worker.toString(), account.toString()]);
+  Future<bool> Function(Uri worker, Uri forum)? readDisclosure;
+  Future<void> Function(Uri worker, Uri forum)? writeDisclosure;
+  String pair(Uri worker, Uri forum) => jsonEncode([worker.toString(), forum.toString()]);
 
   @override
-  Future<bool> disclosureAccepted(Uri worker, Uri account) async =>
-    readDisclosure == null ? accepted.contains(pair(worker, account)) : await readDisclosure!(worker, account);
+  Future<bool> disclosureAccepted(Uri worker, Uri forum) async =>
+    readDisclosure == null ? accepted.contains(pair(worker, forum)) : await readDisclosure!(worker, forum);
 
   @override
-  Future<void> acceptDisclosure(Uri worker, Uri account) async {
+  Future<void> acceptDisclosure(Uri worker, Uri forum) async {
     writes++;
-    if (writeDisclosure != null) await writeDisclosure!(worker, account);
-    accepted.add(pair(worker, account));
+    if (writeDisclosure != null) await writeDisclosure!(worker, forum);
+    accepted.add(pair(worker, forum));
   }
 
   // Auth has no submission journal responsibility. These calls would be a
@@ -80,10 +76,10 @@ class AuthPreferences implements WorkshopPreferences {
 }
 
 class AuthClient extends WorkshopClient {
-  AuthClient({Uri? worker, Uri? account}) : super(origin: worker ?? authWorker,
+  AuthClient({Uri? worker, Uri? forum}) : super(origin: worker ?? authWorker,
     cacheFile: File('unused-auth-state-cache.json'),
     http: FakeWorkshopHttp((method, url, headers, body) => throw StateError('Auth test attempted HTTP'))) {
-    value = WorkshopCapabilities.fromJson(workshopCaps(account: (account ?? authAccount).toString()));
+    value = WorkshopCapabilities.fromJson(workshopCaps(forum: (forum ?? authForum).toString()));
   }
   late WorkshopCapabilities value;
   Future<WorkshopCapabilities> Function()? readCapabilities;
@@ -109,12 +105,13 @@ class _InitialAuthClientChoice extends AuthClientChoice {
 }
 
 class AuthHarness {
-  AuthHarness({AuthClient? client, AuthPreferences? preferences, WorkshopAccountState? initial,
+  AuthHarness({AuthClient? client, AuthPreferences? preferences, ForumAuthState? initial,
     Future<WorkshopClient> Function(AuthClient)? loadClient})
     : client = client ?? AuthClient(), preferences = preferences ?? AuthPreferences(),
-      account = AuthAccountController(initial ?? authSignedIn()) {
+      forum = AuthForumController(initial ?? authSignedIn()), base = AuthBaseController(authForum.toString()) {
     container = ProviderContainer(overrides: [
-      workshopAccountProvider.overrideWith(() => account),
+      forumAuthProvider.overrideWith(() => forum),
+      forumBaseUrlProvider.overrideWith(() => base),
       authClientChoiceProvider.overrideWith(() => _InitialAuthClientChoice(this.client)),
       workshopClientProvider.overrideWith((ref) async {
         final selected = ref.watch(authClientChoiceProvider);
@@ -125,7 +122,8 @@ class AuthHarness {
   }
   final AuthClient client;
   final AuthPreferences preferences;
-  final AuthAccountController account;
+  final AuthForumController forum;
+  final AuthBaseController base;
   late final ProviderContainer container;
 
   WorkshopAccessController get controller => container.read(workshopAccessProvider.notifier);

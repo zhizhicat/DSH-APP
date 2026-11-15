@@ -1,7 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:dsh_app/state/workshop_account_state.dart';
+import 'package:dsh_app/forum/discourse_client.dart';
+import 'package:dsh_app/forum/forum_auth.dart';
 import 'package:dsh_app/state/workshop_auth_state.dart';
 import 'package:dsh_app/workshop/workshop_models.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -13,7 +14,7 @@ void main() {
   test('cold disclosure storage cannot authorize before its result arrives', () async {
     final preferences = AuthPreferences();
     final entered = Completer<void>(), release = Completer<bool>();
-    preferences.readDisclosure = (worker, account) { entered.complete(); return release.future; };
+    preferences.readDisclosure = (worker, forum) { entered.complete(); return release.future; };
     final harness = AuthHarness(preferences: preferences);
     final ready = authReady(harness.container);
     final readySettled = authSettled(ready);
@@ -28,7 +29,7 @@ void main() {
       await ready;
       await expectLater(authorization, authError('workshop_consent_required'));
       expect(harness.state.disclosure!.worker, authWorker);
-      expect(harness.state.disclosure!.account, authAccount);
+      expect(harness.state.disclosure!.forum, authForum);
       expect(preferences.writes, 0);
     } finally {
       if (!release.isCompleted) release.complete(false);
@@ -38,16 +39,16 @@ void main() {
     }
   });
 
-  for (final phase in [WorkshopAccountPhase.restoring, WorkshopAccountPhase.signedOut]) {
-    test('account ${phase.name} never provides a credential disclosure action', () async {
-      final harness = AuthHarness(initial: WorkshopAccountState(phase: phase));
+  for (final phase in [ForumAuthPhase.restoring, ForumAuthPhase.signedOut]) {
+    test('forum ${phase.name} never provides a credential disclosure action', () async {
+      final harness = AuthHarness(initial: ForumAuthState(phase: phase));
       try {
         await authReady(harness.container);
         expect(harness.state.signedIn, isFalse);
-        expect(harness.state.accountRestoring, phase == WorkshopAccountPhase.restoring);
+        expect(harness.state.forumRestoring, phase == ForumAuthPhase.restoring);
         expect(harness.state.disclosure, isNull);
         expect(harness.state.canSubmit('pet'), isFalse);
-        await expectLater(harness.controller.authorize(), authError('workshop_account_auth_required'));
+        await expectLater(harness.controller.authorize(), authError('workshop_forum_auth_required'));
       } finally { harness.dispose(); }
     });
   }
@@ -66,18 +67,18 @@ void main() {
       final authorization = await harness.controller.authorize();
       expect(authorization.client, same(harness.client));
       expect(authorization.credential.worker, authWorker);
-      expect(authorization.credential.account, authAccount);
-      expect(authorization.accountId, 42);
-      expect(jsonDecode(authorization.requestScope!), [authWorker.toString(), authAccount.toString(), 42]);
+      expect(authorization.credential.forum, authForum);
+      expect(authorization.forumUserId, 42);
+      expect(jsonDecode(authorization.requestScope!), [authWorker.toString(), authForum.toString(), 42]);
       expect(authorization.requestScope, isNot(contains('TEST_ONLY_KEY_A')));
       expect(authorization.credential.toString(), 'WorkshopCredential(redacted)');
-      expect(harness.preferences.accepted, {harness.preferences.pair(authWorker, authAccount)});
+      expect(harness.preferences.accepted, {harness.preferences.pair(authWorker, authForum)});
     } finally { harness.dispose(); }
   });
 
   test('failed durable confirmation remains explicit in-memory consent and a retry can persist it', () async {
     final preferences = AuthPreferences()
-      ..writeDisclosure = (worker, account) async => throw const WorkshopException('workshop_preferences');
+      ..writeDisclosure = (worker, forum) async => throw const WorkshopException('workshop_preferences');
     final harness = AuthHarness(preferences: preferences);
     AuthHarness? restarted;
     try {
@@ -104,20 +105,20 @@ void main() {
     }
   });
 
-  test('account origin mismatch blocks credentials and a disclosure offer', () async {
-    final harness = AuthHarness(client: AuthClient(account: Uri.parse('https://another-account.example')));
+  test('forum origin mismatch blocks credentials and a disclosure offer', () async {
+    final harness = AuthHarness(client: AuthClient(forum: Uri.parse('https://another-forum.example')));
     try {
       await authReady(harness.container);
-      expect(harness.state.error!.code, 'workshop_account_origin');
+      expect(harness.state.error!.code, 'workshop_forum_origin');
       expect(harness.state.disclosure, isNull);
       expect(harness.state.canAuthenticate, isFalse);
-      await expectLater(harness.controller.authorize(), authError('workshop_account_origin'));
+      await expectLater(harness.controller.authorize(), authError('workshop_forum_origin'));
       expect(harness.preferences.writes, 0);
     } finally { harness.dispose(); }
   });
 
   test('capability switches limit submission without inventing a signed-out state', () async {
-    final preferences = AuthPreferences()..accepted.add(jsonEncode([authWorker.toString(), authAccount.toString()]));
+    final preferences = AuthPreferences()..accepted.add(jsonEncode([authWorker.toString(), authForum.toString()]));
     final client = AuthClient()..value = WorkshopCapabilities.fromJson(workshopCaps(uploads: false, companion: false));
     final harness = AuthHarness(client: client, preferences: preferences);
     try {
@@ -135,39 +136,39 @@ void main() {
   });
 
   test('first profile arrival retains the credential session and supplies the public scope', () async {
-    const credentials = WorkshopAccountCredential('TEST_ONLY_KEY_A');
-    final preferences = AuthPreferences()..accepted.add(jsonEncode([authWorker.toString(), authAccount.toString()]));
-    final harness = AuthHarness(preferences: preferences, initial: authSignedIn(credential: credentials, userId: null));
+    const credentials = ForumCredentials(key: 'TEST_ONLY_KEY_A', clientId: 'test-client');
+    final preferences = AuthPreferences()..accepted.add(jsonEncode([authWorker.toString(), authForum.toString()]));
+    final harness = AuthHarness(preferences: preferences, initial: authSignedIn(credentials: credentials, userId: null));
     try {
       await authReady(harness.container);
       final session = harness.state.session;
       expect(harness.state.canAuthenticate, isTrue);
       expect(harness.state.canSubmit('pet'), isFalse);
       expect((await harness.controller.authorize()).requestScope, isNull);
-      harness.account.emit(authSignedIn(credential: credentials));
+      harness.forum.emit(authSignedIn(credentials: credentials));
       await authReady(harness.container);
       expect(harness.state.session, same(session));
       expect(harness.state.canSubmit('pet'), isTrue);
       expect(jsonDecode((await harness.controller.authorize()).requestScope!),
-        [authWorker.toString(), authAccount.toString(), 42]);
+        [authWorker.toString(), authForum.toString(), 42]);
     } finally { harness.dispose(); }
   });
 
   test('a changed known account id invalidates its old disclosure object', () async {
-    const credentials = WorkshopAccountCredential('TEST_ONLY_KEY_A');
-    final harness = AuthHarness(initial: authSignedIn(credential: credentials));
+    const credentials = ForumCredentials(key: 'TEST_ONLY_KEY_A', clientId: 'test-client');
+    final harness = AuthHarness(initial: authSignedIn(credentials: credentials));
     try {
       await authReady(harness.container);
       final session = harness.state.session, oldOffer = harness.state.disclosure!;
-      harness.account.emit(authSignedIn(credential: credentials, userId: null));
+      harness.forum.emit(authSignedIn(credentials: credentials, userId: null));
       await authReady(harness.container);
       expect(harness.state.session, same(session));
-      expect(harness.state.accountId, isNull);
+      expect(harness.state.forumUserId, isNull);
       expect(harness.state.canSubmit('pet'), isFalse);
-      harness.account.emit(authSignedIn(credential: credentials, userId: 43));
+      harness.forum.emit(authSignedIn(credentials: credentials, userId: 43));
       await authReady(harness.container);
       expect(harness.state.session, isNot(same(session)));
-      expect(harness.state.accountId, 43);
+      expect(harness.state.forumUserId, 43);
       await harness.controller.confirmDisclosure(oldOffer);
       expect(harness.state.error!.code, 'workshop_confirmation_stale');
       expect(harness.preferences.writes, 0);
@@ -184,7 +185,7 @@ void main() {
       await authReady(harness.container);
       final oldOffer = harness.state.disclosure!, oldSession = harness.state.session;
       var reads = 0;
-      harness.preferences.readDisclosure = (worker, account) async {
+      harness.preferences.readDisclosure = (worker, forum) async {
         if (reads++ == 0) { entered.complete(); return release.future; }
         return false;
       };
@@ -193,8 +194,8 @@ void main() {
       await authSignal(entered, refreshing);
       authorization = harness.controller.authorize();
       final authorizationSettled = authSettled(authorization);
-      harness.account.emit(authSignedIn(credential:
-        const WorkshopAccountCredential('TEST_ONLY_KEY_B')));
+      harness.forum.emit(authSignedIn(credentials:
+        const ForumCredentials(key: 'TEST_ONLY_KEY_B', clientId: 'test-client')));
       release.complete(false);
       await expectLater(authorization, authError('workshop_cancelled'));
       await refreshing;
@@ -242,20 +243,18 @@ void main() {
     }
   });
 
-  test('waiting for a GitHub code keeps the signed-out session; availability follows capabilities', () async {
-    final client = AuthClient()..value = WorkshopCapabilities.fromJson(workshopCaps(clientId: null));
-    final harness = AuthHarness(client: client, initial: authSignedOut);
+  test('forum source change invalidates the previous confirmation and origin match', () async {
+    final harness = AuthHarness();
     try {
       await authReady(harness.container);
-      expect(harness.state.signInAvailable, isFalse);
-      final session = harness.state.session;
-      await harness.account.startSignIn();
-      expect(harness.state.session, same(session));
-      expect(harness.state.signedIn, isFalse);
-      client.value = WorkshopCapabilities.fromJson(workshopCaps());
-      await harness.controller.refresh();
-      expect(harness.state.signInAvailable, isTrue);
-      expect(harness.state.session, same(session));
+      final oldOffer = harness.state.disclosure!, oldSession = harness.state.session;
+      harness.base.select(Uri.parse('https://new-forum.example'));
+      await authReady(harness.container);
+      expect(harness.state.session, isNot(same(oldSession)));
+      expect(harness.state.error!.code, 'workshop_forum_origin');
+      await harness.controller.confirmDisclosure(oldOffer);
+      expect(harness.state.error!.code, 'workshop_confirmation_stale');
+      expect(harness.preferences.writes, 0);
     } finally { harness.dispose(); }
   });
 
@@ -280,7 +279,7 @@ void main() {
   });
 
   test('a newer capability refresh invalidates an authorization waiting on the older load', () async {
-    final preferences = AuthPreferences()..accepted.add(jsonEncode([authWorker.toString(), authAccount.toString()]));
+    final preferences = AuthPreferences()..accepted.add(jsonEncode([authWorker.toString(), authForum.toString()]));
     final harness = AuthHarness(preferences: preferences);
     final entered = Completer<void>(), release = Completer<WorkshopCapabilities>();
     Future<void>? oldRefresh;

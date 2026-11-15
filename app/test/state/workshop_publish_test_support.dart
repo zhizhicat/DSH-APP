@@ -1,7 +1,8 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:dsh_app/state/workshop_account_state.dart';
+import 'package:dsh_app/forum/forum_auth.dart';
+import 'package:dsh_app/forum/forum_state.dart';
 import 'package:dsh_app/state/workshop_dependencies.dart';
 import 'package:dsh_app/state/workshop_preferences.dart';
 import 'package:dsh_app/state/workshop_publication.dart';
@@ -21,16 +22,16 @@ WorkshopPublicationInput publishInput({bool rights = true}) => WorkshopPublicati
 );
 
 WorkshopSubmission publishResult(WorkshopMetadata metadata, {String? id,
-  WorkshopSubmissionStatus status = WorkshopSubmissionStatus.draft, int ownerId = 42, Uri? account}) =>
+  WorkshopSubmissionStatus status = WorkshopSubmissionStatus.draft, int ownerId = 42, Uri? forum}) =>
     WorkshopSubmission.fromJson({
       'submissionId': id ?? 'b' * 32, 'metadata': metadata.toJson(), 'status': status.name,
-      'owner': {'accountOrigin': (account ?? authAccount).toString(), 'accountId': ownerId, 'username': 'test-user'},
+      'owner': {'forumOrigin': (forum ?? authForum).toString(), 'forumUserId': ownerId, 'username': 'test-user'},
       'createdAt': '2026-11-11T00:00:00.000Z', 'updatedAt': '2026-11-11T00:00:00.000Z',
     });
 
 class PublishPreferences extends AuthPreferences {
   PublishPreferences(this.events) {
-    accepted.add(pair(authWorker, authAccount));
+    accepted.add(pair(authWorker, authForum));
   }
   final List<String> events;
   final ids = <String, String>{};
@@ -189,13 +190,15 @@ final _publishClientChoice = NotifierProvider<_PublishClientChoice, PublishClien
 
 class PublishHarness {
   PublishHarness({PublishPreferences? preferences, PublishClient? client, PublishDrafts? drafts,
-    WorkshopAccountState? initial, List<String>? events})
-    : events = events ?? <String>[], account = AuthAccountController(initial ?? authSignedIn()) {
+    ForumAuthState? initial, List<String>? events})
+    : events = events ?? <String>[], forum = AuthForumController(initial ?? authSignedIn()),
+      base = AuthBaseController(authForum.toString()) {
     this.preferences = preferences ?? PublishPreferences(this.events);
     this.client = client ?? PublishClient(this.events);
     this.drafts = drafts ?? PublishDrafts(this.events);
     container = ProviderContainer(overrides: [
-      workshopAccountProvider.overrideWith(() => account),
+      forumAuthProvider.overrideWith(() => forum),
+      forumBaseUrlProvider.overrideWith(() => base),
       _publishClientChoice.overrideWith(() => _PublishClientChoice(this.client)),
       workshopClientProvider.overrideWith((ref) async => ref.watch(_publishClientChoice)),
       workshopPreferencesProvider.overrideWithValue(this.preferences),
@@ -212,7 +215,8 @@ class PublishHarness {
     ]);
   }
   final List<String> events;
-  final AuthAccountController account;
+  final AuthForumController forum;
+  final AuthBaseController base;
   late final PublishPreferences preferences;
   late final PublishClient client;
   late final PublishDrafts drafts;

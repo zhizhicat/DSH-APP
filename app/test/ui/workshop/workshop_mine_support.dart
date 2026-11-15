@@ -2,7 +2,8 @@
 // client that never opens a socket (test/state/workshop_personal_test_support):
 // what the page shows is what the state layer really does with each answer.
 
-import 'package:dsh_app/state/workshop_account_state.dart';
+import 'package:dsh_app/forum/forum_auth.dart';
+import 'package:dsh_app/forum/forum_state.dart';
 import 'package:dsh_app/l10n/l10n.dart';
 import 'package:dsh_app/state/workshop_dependencies.dart';
 import 'package:dsh_app/state/workshop_preferences.dart';
@@ -14,24 +15,25 @@ import '../../chat/support/harness.dart' show testApp;
 import '../../state/workshop_auth_test_support.dart';
 import '../../state/workshop_personal_test_support.dart';
 
-export '../../state/workshop_auth_test_support.dart' show authAccount, authSignedIn, authSignedOut, authWorker;
+export '../../state/workshop_auth_test_support.dart' show authForum, authSignedIn, authWorker;
 export '../../state/workshop_personal_test_support.dart';
 
-/// The GitHub account, the workshop client and the stored agreement a test
+/// The forum account, the workshop client and the stored agreement a test
 /// page runs on.
 class WorkshopPageWorld {
-  WorkshopPageWorld({WorkshopAccountState? account, bool consent = true, PersonalClient? client})
+  WorkshopPageWorld({ForumAuthState? account, bool consent = true, PersonalClient? client})
     : client = client ?? PersonalClient(),
-      accountController = AuthAccountController(account ?? authSignedIn()) {
-    if (consent) preferences.accepted.add(preferences.pair(this.client.origin, authAccount));
+      forum = AuthForumController(account ?? authSignedIn()) {
+    if (consent) preferences.accepted.add(preferences.pair(this.client.origin, authForum));
   }
 
   final PersonalClient client;
-  final AuthAccountController accountController;
+  final AuthForumController forum;
   final preferences = AuthPreferences();
 
   List<Override> get overrides => [
-    workshopAccountProvider.overrideWith(() => accountController),
+    forumAuthProvider.overrideWith(() => forum),
+    forumBaseUrlProvider.overrideWith(() => AuthBaseController(authForum.toString())),
     workshopClientProvider.overrideWith((ref) async => client),
     workshopPreferencesProvider.overrideWithValue(preferences),
   ];
