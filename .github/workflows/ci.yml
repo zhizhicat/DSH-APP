@@ -227,13 +227,17 @@ jobs:
         run: |
           version=$(sed -nE 's/^DSH_VERSION="\$\{DSH_VERSION:-(.+)\}"$/\1/p' runtime/build-runtime.sh)
           if [ -z "$version" ]; then
-            # DSH_VERSION unpinned = pull upstream latest (same rule as the layers build)
-            if [ "$RUNNER_ENVIRONMENT" = "github-hosted" ]; then
-              # GitHub runners sit close to the official registry; the CN mirror's
-              # dist-tags lag behind and have already desynced version detection once.
-              version=$(npm view @deepseek-ai/dsh version --registry https://registry.npmjs.org)
-            else
-              version=$(npm view @deepseek-ai/dsh version --registry https://registry.npmmirror.com)
+            # Prefer the newest pinned lock: it is the exact, reproducible tree the
+            # layers build ships (first-run lock snapshots stay inside the runner).
+            # Upstream dist-tags have flapped (latest rc.3 -> rc.1, rc.3 moved to next),
+            # so the npm registry is only a fallback when no lock exists at all.
+            version=$(ls runtime/locks | sed -nE 's/^dsh-(.+)$/\1/p' | sort -V | tail -1 || true)
+            if [ -z "$version" ]; then
+              if [ "$RUNNER_ENVIRONMENT" = "github-hosted" ]; then
+                version=$(npm view @deepseek-ai/dsh version --registry https://registry.npmjs.org)
+              else
+                version=$(npm view @deepseek-ai/dsh version --registry https://registry.npmmirror.com)
+              fi
             fi
           fi
           prefix="$RUNNER_TEMP/dsh"
