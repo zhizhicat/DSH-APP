@@ -377,7 +377,10 @@ def cmd_patch_dsh(args):
     after_positions = {}
     if not args.record:
         for position, name in enumerate(names):
-            for rel, pin in pins["patches"].get(name, {}).get(args.dsh_version, {}).items():
+            version_pins = pins["patches"].get(name, {}).get(args.dsh_version, {})
+            if version_pins is False:
+                continue  # whole patch marked N/A for this DSH version
+            for rel, pin in version_pins.items():
                 if rel in terminal and terminal[rel] != pin["before"]:
                     sys.exit("%s: broken patch hash chain for %s" % (name, rel))
                 terminal[rel] = pin["after"]
