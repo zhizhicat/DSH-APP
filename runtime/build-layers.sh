@@ -71,4 +71,23 @@ for pair in $RUNTIME_VARIANTS; do
 done
 
 write_layers_index "$abi"
+
+# v1.5 compose 块：合并 base/node 镜像组 + engine lock 清单 + 增量包描述进 index 顶层
+if compgen -G "$OUT/compose/base-*.json" >/dev/null; then
+  log "composing delta manifest into layers-index"
+  python3 runtime/export-compose.py \
+    --lock "$LOCKS/dsh-${DSH_VERSION}/package-lock.json" \
+    --pnpm-lock "$LOCKS/pnpm-${PNPM_VERSION}/package-lock.json" \
+    --engine-version "${dsh_tag:-$DSH_VERSION}" \
+    --compose-dir "$OUT/compose" --index "$OUT/layers-index.json" \
+    --node-mirrors "$NODE_MIRRORS" --out "$OUT/compose.json" >&2
+  python3 - "$OUT/compose.json" "$OUT/layers-index.json" <<'PYC'
+import json, sys
+compose, index_path = json.load(open(sys.argv[1])), sys.argv[2]
+idx = json.load(open(index_path))
+idx["compose"] = compose
+json.dump(idx, open(index_path, "w"), indent=2, sort_keys=True)
+print("layers-index.json now carries compose (schema %s)" % compose.get("schema"))
+PYC
+fi
 log "done: $OUT/layers-index.json"

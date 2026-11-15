@@ -66,6 +66,8 @@ def main():
     ap.add_argument("--pnpm-lock", help="pnpm package-lock.json（engine 的 pnpm 包）")
     ap.add_argument("--index", help="layers-index.json（读取 base/node 层描述）")
     ap.add_argument("--engine-version")
+    ap.add_argument("--compose-dir", help="build_abi 的 export_deltas 产物目录（base-*/base-debs-*/engine-adapter-* json）")
+    ap.add_argument("--node-mirrors", help="空格分隔的 node 发布镜像组（附加 /v<ver>/<file>）")
     ap.add_argument("--out", required=True)
     args = ap.parse_args()
 
@@ -97,6 +99,27 @@ def main():
                               "tarball": npm_tarball_path(name, version), "integrity": integrity}
         else:
             raise SystemExit("cannot derive pnpm tarball identity from " + args.pnpm_lock)
+
+    # compose-dir 聚合：export_deltas 的 base 镜像组/sha、增量包描述、adapter 包
+    if args.compose_dir:
+        import glob, os
+        for bf in sorted(glob.glob(os.path.join(args.compose_dir, "base-*.json"))):
+            if "debs" in os.path.basename(bf):
+                continue
+            doc = json.load(open(bf))
+            variant = os.path.basename(bf)[len("base-"):-len(".json")]
+            compose.setdefault("baseVariants", {})[variant] = doc["base"]
+            if args.node_mirrors and "node" not in compose:
+                compose["node"] = doc["node"]
+        for bf in sorted(glob.glob(os.path.join(args.compose_dir, "base-debs-*.json"))):
+            variant = os.path.basename(bf)[len("base-debs-"):-len(".json")]
+            compose.setdefault("baseVariants", {}).setdefault(variant, {})["debsDelta"] = json.load(open(bf))
+        for bf in sorted(glob.glob(os.path.join(args.compose_dir, "engine-adapter-*.json"))):
+            engine["adapter"] = json.load(open(bf))
+        if args.node_mirrors and "node" in compose:
+            nt = compose["node"]["tar"]
+            nt["mirrors"] = ["%s/v%s/%s" % (m.rstrip("/"), nt.get("version", ""), nt.get("file", ""))
+                             for m in args.node_mirrors.split()]
 
     # base/node 层的原始物镜像组：构建时由 build-layers.sh 注入（--mirror-args 或 env），
     # 这里只搭骨架；镜像路径与 sha 的权威来源是 pins.json + 变体循环。

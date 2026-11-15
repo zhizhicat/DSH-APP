@@ -371,6 +371,87 @@ npm_run() {  # npm with registry fallback: NPM_REGISTRIES 逐个降级，全部�
   return 1
 }
 
+export_deltas() {  # v1.5 compose 块素材：原始物 sha+镜像组、增量包（debs/python/bridge）
+  # $@ = base node python debs... bridge（由 build_abi 尾部传入）
+  local base="$1" node="$2" python="$3" bridge="$4"; shift 4
+  local -a debs=("$@")
+  local cdir="$OUT/compose"; mkdir -p "$cdir" "$OUT/arm64-v8a/assets/runtime" 2>/dev/null || mkdir -p "$cdir"
+  local assets; assets="$(dirname "$cdir")/arm64-v8a/assets/runtime"
+  [[ -d "$assets" ]] || assets="$OUT/assets"
+  mkdir -p "$assets"
+
+  # base 块：rootfs 镜像组 + sha；debs/python 逐件 sha（增量包内）
+  local base_json="$cdir/base-${BASE}-${abi}.json"
+  local -a mirrors=()
+  local rel=""
+  if [[ "$DISTRO" == debian ]]; then
+    for m in $DEBIAN_LXC_MIRRORS; do mirrors+=("$m/$APT_CODENAME/${ubuntu_arch:-arm64}/default/$LXC_DATE/rootfs.tar.xz"); done
+  else
+    local fname; fname="$(basename "$base")"
+    for m in $UBUNTU_CDIMAGE_MIRRORS; do mirrors+=("$m/${UBUNTU_VERSION%.*}/release/$fname"); done
+  fi
+  python3 - "$base_json" "$base" "$node" "$python" "$DISTRO" <<'PYD'
+import json, sys, os, hashlib
+out, base, node, python_, distro = sys.argv[1:6]
+def sha(p):
+    h = hashlib.sha256()
+    with open(p, "rb") as f:
+        for chunk in iter(lambda: f.read(1 << 20), b""): h.update(chunk)
+    return h.hexdigest()
+with open(sys.argv[5]) as f:
+    mirrors = [l.strip() for l in f if l.strip()]
+doc = {"schema": 1, "base": {"rootfs": {"mirrors": mirrors, "sha256": sha(base)}},
+       "node": {"tar": {"sha256": sha(node), "version": os.environ["DELTA_NODE_VERSION"],
+                        "file": os.environ["DELTA_NODE_FILE"]}}}
+json.dump(doc, open(out, "w"), indent=2, sort_keys=True)
+print("wrote " + out)
+PYD
+  printf '%s\n' "${mirrors[@]}" > "$cdir/base-mirrors-${BASE}-${abi}.txt"
+  DELTA_NODE_VERSION="$NODE_VERSION" DELTA_NODE_FILE="$(basename "$node")" \
+    python3 - "$base_json" "$base" "$node" "$python" "$cdir/base-mirrors-${BASE}-${abi}.txt" >/dev/null
+
+  # base 增量包：debs + python（无国内镜像的私有输入物）
+  if [[ ${#debs[@]} -gt 0 || -n "$python" ]]; then
+    local delta="$assets/base-debs-${BASE}-${abi}.tar.xz"
+    log "delta: base-debs ${BASE} (${#debs[@]} debs + python)"
+    printf '%s\n' "${debs[@]}" > "$cdir/base-debs-${BASE}-${abi}.list"
+    # 绝对路径列表，-C / 去前导斜杠：包内路径与 .list 一一对应，App 端按 .list 映射
+    tar -cJf "$delta" -C / --files-from <(printf '%s\n' "${debs[@]}" "$python")
+    python3 - "$cdir/base-debs-${BASE}-${abi}.json" "$delta" "$cdir/base-debs-${BASE}-${abi}.list" "$python" <<'PYD2'
+import json, sys, hashlib, os
+out, delta, listfile, python_ = sys.argv[1:5]
+def sha(p):
+    h = hashlib.sha256()
+    with open(p, "rb") as f:
+        for chunk in iter(lambda: f.read(1 << 20), b""): h.update(chunk)
+    return h.hexdigest()
+doc = {"asset": os.path.basename(delta), "sha256": sha(delta), "bytes": os.path.getsize(delta),
+       "debs": [l.strip() for l in open(listfile) if l.strip()],
+       "python": {"file": os.path.basename(python_), "sha256": sha(python_)}}
+json.dump(doc, open(out, "w"), indent=2, sort_keys=True)
+print("wrote " + out)
+PYD2
+  fi
+
+  # engine adapter 增量包：bridge 树 → opt/dsh-go 前缀（overlay 静态脚本随 compose 下发由 App 终写）
+  local adapter="$assets/engine-adapter-${abi}.tar.xz"
+  log "delta: engine-adapter (${bridge##*/} → opt/dsh-go)"
+  ( cd "$bridge" && find . -type f | tar -cJf "$adapter" --transform 's|^\./|opt/dsh-go/|' -T - )
+  python3 - "$cdir/engine-adapter-${abi}.json" "$adapter" <<'PYD3'
+import json, sys, hashlib, os
+out, adapter = sys.argv[1:3]
+def sha(p):
+    h = hashlib.sha256()
+    with open(p, "rb") as f:
+        for chunk in iter(lambda: f.read(1 << 20), b""): h.update(chunk)
+    return h.hexdigest()
+doc = {"asset": os.path.basename(adapter), "sha256": sha(adapter), "bytes": os.path.getsize(adapter),
+       "unpackPrefix": "opt/dsh-go"}
+json.dump(doc, open(out, "w"), indent=2, sort_keys=True)
+print("wrote " + out)
+PYD3
+}
+
 install_dsh() {  # $1 = npm cpu, $2 = prefix dir
   local cpu="$1" prefix="$2" bin; bin="$(host_npm)"
   local lockdir="$LOCKS/dsh-$DSH_VERSION"
@@ -616,6 +697,9 @@ PYEOF
               "$assets/node-v${NODE_VERSION}-$abi.tar.$COMPRESS" \
               "$assets/engine-dsh${dsh_tag}-$abi.tar.$COMPRESS")
     archive_args=(--base-out "${archives[0]}" --node-out "${archives[1]}" --engine-out "${archives[2]}" --base-cache "$BASE_LAYER_CACHE")
+  fi
+  if [[ "${EXPORT_DELTAS:-1}" == "1" && "$RUNTIME_LAYERS" == "3" ]]; then
+    export_deltas "$base" "$node" "$python" "$bridge" "${extra_debs[@]}"
   fi
   local -a prune=(); [[ "$PRUNE_DEV_METADATA" == 1 ]] && prune=(--prune-dev-metadata)
   log "assembling rootfs ($COMPRESS)"
