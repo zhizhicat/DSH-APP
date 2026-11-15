@@ -113,24 +113,9 @@ class _PhoneDndPageState extends ConsumerState<PhoneDndPage> {
     return result.ok;
   }
 
-  bool get _resourceBlocked => ref.read(phoneProvider).status.background.gateCleanup?.blocked == true;
-
-  Future<void> _retryResourceRecovery() async {
-    await _run(() async {
-      final result = await _phone.retryBackgroundRecovery();
-      if (result.ok || !mounted) return result;
-      return PhoneResult(false, context.l10n.phoneResourceRecoveryPending);
-    });
-  }
-
-  Future<void> _retryCleanup(String handle) async {
-    // Capture the displayed handle, never substitute a newer status after awaiting.
-    await _run(() => _phone.retryBackgroundGateCleanup(handle), done: context.l10n.phoneGateCleanupDone);
-  }
-
   /// The explicit choice. Root still requires its risk notice and the manager prompt.
   Future<void> _use(PhonePrivilegedMode mode) async {
-    if (!_ready || _resourceBlocked) return;
+    if (!_ready) return;
     if (mode == PhonePrivilegedMode.root && !await confirmRisk(context, RiskNotices.rootChannel)) return;
     if (!mounted) return;
     // Folded back once it works: the row says 使用中.
@@ -233,46 +218,6 @@ class _PhoneDndPageState extends ConsumerState<PhoneDndPage> {
       title: l10n.phoneDndTitle,
       subtitle: Text(l10n.phoneDndSubtitle),
       children: [
-        if (bg.resourceRecovery case final recovery? when recovery.blocked)
-          ListPageCard(
-            margin: _groupMargin,
-            children: [
-              ListPageRow(
-                key: const ValueKey('phone-resource-recovery'),
-                title: l10n.phoneResourceRecoveryTitle,
-                titleMaxLines: 3,
-                subtitle: recovery.state == 'loading' || recovery.state == 'recovering'
-                    ? l10n.phoneResourceRecoveryRunning
-                    : recovery.state == 'error'
-                        ? l10n.phoneResourceRecoveryStorage
-                        : l10n.phoneResourceRecoveryPending,
-                subtitleMaxLines: 10,
-                trailing: TextButton(
-                  key: const ValueKey('phone-resource-recovery-retry'),
-                  onPressed: _ready && !_busy && recovery.canRetry ? _retryResourceRecovery : null,
-                  child: Text(l10n.phoneResourceRecoveryRetry),
-                ),
-              ),
-            ],
-          ),
-        if (bg.gateCleanup case final cleanup? when cleanup.blocked)
-          ListPageCard(
-            margin: _groupMargin,
-            children: [
-              ListPageRow(
-                key: const ValueKey('phone-gate-cleanup'),
-                title: l10n.phoneGateCleanupTitle,
-                titleMaxLines: 3,
-                subtitle: cleanup.state == 'unknown' ? l10n.phoneGateCleanupUnknown : l10n.phoneGateCleanupRunning,
-                subtitleMaxLines: 8,
-                trailing: TextButton(
-                  key: const ValueKey('phone-gate-cleanup-retry'),
-                  onPressed: _ready && !_busy && cleanup.canRetry ? () => _retryCleanup(cleanup.handle!) : null,
-                  child: Text(l10n.phoneGateCleanupRetry),
-                ),
-              ),
-            ],
-          ),
         if (!bg.androidOk) PhoneNote(tone: NoteTone.warn, text: l10n.phoneDndUnsupported),
         if (using != PhonePrivilegedMode.off) ...[
           ListPageCard(
@@ -314,36 +259,48 @@ class _PhoneDndPageState extends ConsumerState<PhoneDndPage> {
           if (!bg.effectiveReady && !waiting)
             PhoneNote(tone: NoteTone.warn, text: bg.effectiveReason ?? l10n.phoneNotReadyYet),
         ],
-        if (bg.parallelism case final capacity? when status.ready)
-          ListPageCard(
-            margin: _groupMargin,
-            title: l10n.phoneBackgroundParallelTitle,
-            children: [
-              ListPageRow(
-                title: l10n.phoneBackgroundParallelStatus(capacity.configuredLimit, capacity.effectiveLimit, capacity.heldSlots),
-                titleMaxLines: 4,
-                subtitle: switch (capacity.reason) {
-                  'off' => l10n.phoneBackgroundParallelOff,
-                  'unsupported' => l10n.phoneBackgroundParallelUnsupported,
-                  'connectionRequired' => l10n.phoneBackgroundParallelConnection,
-                  'busy' => l10n.phoneBackgroundParallelBusy,
-                  'resourceRecovery' => l10n.phoneBackgroundParallelRecovery,
-                  'peerUnsupported' => l10n.phoneBackgroundParallelPeer,
-                  'transportSerial' => l10n.phoneBackgroundParallelSerial,
-                  _ => l10n.phoneBackgroundParallelDescription,
-                },
-                subtitleMaxLines: 5,
-              ),
-              for (final limit in const [1, 2, 3])
-                Semantics(
-                  selected: capacity.configuredLimit == limit,
-                  inMutuallyExclusiveGroup: true,
-                  child: ListPageRow(
-                    key: ValueKey('phone-background-limit-$limit'),
-                    leading: Icon(capacity.configuredLimit == limit ? AppIcons.radioOn : AppIcons.radioOff),
-                    title: l10n.phoneBackgroundParallelChoice(limit),
-                    onTap: !_ready || _busy || capacity.configuredLimit == limit ? null : () =>
-                      unawaited(_run(() => _phone.setBackgroundParallelLimit(limit))),
+        if (_error case final error? when error != bg.effectiveReason) PhoneNote(tone: NoteTone.warn, text: error),
+        if (bg.keep.enabled && _keepStatus(bg.keep).$1 != null)
+          PhoneNote(
+            tone: bg.keep.phase == PhoneKeepPhase.failed ? NoteTone.warn : NoteTone.info,
+            text: _keepStatus(bg.keep).$1!,
+          ),
+        if (using != PhonePrivilegedMode.off) ListPageCard(margin: _groupMargin, children: _channel(using, bg, open)),
+        if (using == PhonePrivilegedMode.off)
+          ...choices
+        else
+          PhoneOptionsFold(
+            key: const ValueKey('phone-dnd-channels'),
+            title: l10n.phoneDndChangeChannel,
+            children: choices,
+          ),
+        PhoneOptionsFold(
+          key: const ValueKey('phone-dnd-options'),
+          title: l10n.phoneControlAdvanced,
+          children: [
+            if (using != PhonePrivilegedMode.off && bg.privileged != null)
+              ListPageCard(margin: _groupMargin, children: [_keepRow(using, bg.keep)]),
+            if (bg.parallelism case final capacity? when status.ready)
+              ListPageCard(
+                margin: _groupMargin,
+                title: l10n.phoneBackgroundParallelTitle,
+                children: [
+                  ListPageRow(
+                    title: l10n.phoneBackgroundParallelStatus(
+                      capacity.configuredLimit,
+                      capacity.effectiveLimit,
+                      capacity.heldSlots,
+                    ),
+                    titleMaxLines: 4,
+                    subtitle: switch (capacity.reason) {
+                      'off' => l10n.phoneBackgroundParallelOff,
+                      'unsupported' => l10n.phoneBackgroundParallelUnsupported,
+                      'connectionRequired' => l10n.phoneBackgroundParallelConnection,
+                      'busy' => l10n.phoneBackgroundParallelBusy,
+                      'transportSerial' => l10n.phoneBackgroundParallelSerial,
+                      _ => l10n.phoneBackgroundParallelDescription,
+                    },
+                    subtitleMaxLines: 5,
                   ),
                 ),
             ],
@@ -531,7 +488,7 @@ class _PhoneDndPageState extends ConsumerState<PhoneDndPage> {
   Widget _useButton(PhonePrivilegedMode mode, PhoneBackgroundStatus bg) {
     final l10n = context.l10n;
     return FilledButton(
-      onPressed: _ready && bg.androidOk && !_busy && !_resourceBlocked ? () => _use(mode) : null,
+      onPressed: _ready && bg.androidOk && !_busy ? () => _use(mode) : null,
       child: Text(
         bg.effectiveMode == mode
             ? l10n.phoneGateRetest
@@ -615,7 +572,7 @@ class _PhoneDndPageState extends ConsumerState<PhoneDndPage> {
             ? null
             : using
             ? FilledButton(
-                onPressed: _ready && bg.androidOk && !_busy && !_resourceBlocked ? () => _use(PhonePrivilegedMode.root) : null,
+                onPressed: _ready && bg.androidOk && !_busy ? () => _use(PhonePrivilegedMode.root) : null,
                 child: Text(r.connected ? l10n.phoneGateRetest : l10n.phoneDndRootRetry),
               )
             : _useButton(PhonePrivilegedMode.root, bg),
