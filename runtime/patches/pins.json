@@ -624,7 +624,9 @@
           "after": "a26b396baee3c353b5bd55c932e30f2653b083a136e7a8f9f596e9fe4c1222b0",
           "before": "931ca0cb10c5102066c7723690a887f0e6e8e7ab0ffdee1a782686745b0b934f"
         }
-      }
+      },
+      "0.2.2-rc.2": false,
+      "0.2.2-rc.3": false
     },
     "zzzzzzz-atomic-claim-write-failure.diff": {
       "0.2.1-rc.4": {
@@ -638,7 +640,9 @@
           "after": "92b9d32bd271d1931bfff55a5d46996cbb691225ee911ee7f1483f35ae0916d4",
           "before": "872d7c1e6e9b267775199bdd3632870f82780d0a5ba047febc93fde94fde53f7"
         }
-      }
+      },
+      "0.2.2-rc.2": false,
+      "0.2.2-rc.3": false
     },
     "zzzzzzz-atomic-lock-write-failure.diff": {
       "0.2.2-rc.1": {
@@ -646,7 +650,9 @@
           "after": "000b8994abcbec4e01b2b714fe8c2a37e61670c52e7d3acaf40ec8d39f484dc7",
           "before": "92b9d32bd271d1931bfff55a5d46996cbb691225ee911ee7f1483f35ae0916d4"
         }
-      }
+      },
+      "0.2.2-rc.2": false,
+      "0.2.2-rc.3": false
     },
     "zzzzzzz-bundle-membership.diff": {
       "0.2.1-rc.4": {
@@ -668,7 +674,9 @@
           "after": "a50f853f9cc1d4d4d2eea6c4f21498ef604ef11ae3131bc41e21189fc5f4483a",
           "before": "516caad9c0dd0c67c9785eb95490b84f459eaa41e818e41a5b3c4ae8917b79d8"
         }
-      }
+      },
+      "0.2.2-rc.2": false,
+      "0.2.2-rc.3": false
     },
     "zzzzzzz-file-query-normalization.diff": {
       "0.2.1-rc.4": {
@@ -682,7 +690,9 @@
           "after": "4a5186dd26b6d00eb8693facac0a1ff27e123b1d7d9a4c8dac6fdfa5fe2ed5dc",
           "before": "99988e1858e227391386ec8579a2991e8be0104a9c9ea6b0b2baeb13cb3b89e6"
         }
-      }
+      },
+      "0.2.2-rc.2": false,
+      "0.2.2-rc.3": false
     },
     "zzzzzzz-file-reference-owner-dispose.diff": {
       "0.2.1-rc.4": {
@@ -696,7 +706,9 @@
           "after": "158927a41db5c86c781e9e03073f76e7e0c4fa6b69f7eb4ec4345021fbd26921",
           "before": "4a5186dd26b6d00eb8693facac0a1ff27e123b1d7d9a4c8dac6fdfa5fe2ed5dc"
         }
-      }
+      },
+      "0.2.2-rc.2": false,
+      "0.2.2-rc.3": false
     },
     "zzzzzzz-grep-retention-preview.diff": {
       "0.2.1-rc.4": {
@@ -710,7 +722,9 @@
           "after": "0429499bcac92b481d769dbe2164bb48c08bcd215df0dd6195d44699d2d258ce",
           "before": "b660d88ee7c4f2bc9a11b7705b21c91e36b88b07bb1a245f0d317085286c8152"
         }
-      }
+      },
+      "0.2.2-rc.2": false,
+      "0.2.2-rc.3": false
     },
     "zzzzzzz-input-recovery.diff": {
       "0.2.1-rc.4": {
@@ -732,7 +746,9 @@
           "after": "cd7fd35ee3f4cc3c0d8d6121361bf81fc12549ed04be12818ca00ba70ac70353",
           "before": "11efab2777be2d8e66c16c475e6d67e7f0352a27a4a7ed8bfdda71a662aea0e6"
         }
-      }
+      },
+      "0.2.2-rc.2": false,
+      "0.2.2-rc.3": false
     },
     "zzzzzzz-job-follow-removal.diff": {
       "0.2.1-rc.4": {
@@ -746,7 +762,9 @@
           "after": "d44f9cc5a6d70a8dcb9ff5773b42cea00f00a437586494e89e5feb6f537f03f7",
           "before": "e1c9bbfd55f375a3c7e2d8d7b2578a48c6fcda1be5e332d8456238a51b9f33b1"
         }
-      }
+      },
+      "0.2.2-rc.2": false,
+      "0.2.2-rc.3": false
     },
     "zzzzzzz-job-ring-trim.diff": {
       "0.2.1-rc.4": {
@@ -760,7 +778,9 @@
           "after": "223f6569c2be54c26cf537ed8014b3330ea2f69cc0a3e3d5bba46c2fc413cbf8",
           "before": "cecdc8a766f62b28999ffff574008d34a39e276d91c4cc648f10ccb18afbed34"
         }
-      }
+      },
+      "0.2.2-rc.2": false,
+      "0.2.2-rc.3": false
     },
     "zzzzzzz-jsonl-root-check-retry.diff": {
       "0.2.1-rc.4": {
@@ -774,7 +794,9 @@
           "after": "0c742ac1ed6b17e46e173af8e56abb2829c1ac66cc30b598c7e5a23f15b11e79",
           "before": "a971769ec5ebe42a1bcd214b57b6741fed3b7040943eec3b96a2d7e77806d343"
         }
-      }
+      },
+      "0.2.2-rc.2": false,
+      "0.2.2-rc.3": false
     },
     "zzzzzzz-mcp-resource-lookup.diff": {
       "0.2.1-rc.4": {
@@ -788,7 +810,9 @@
           "after": "e83553528bae3b31fe2e4c6eab1d38747b61983fecc817015fa95e02a7ef8737",
           "before": "7fa2e6049494b502ae756bf557c1f744a07835b850e6e0e0ddb555a488f3a094"
         }
-      }
+      },
+      "0.2.2-rc.2": false,
+      "0.2.2-rc.3": false
     },
     "zzzzzzz-piai-developer-tools.diff": {
       "0.2.1-rc.4": {
@@ -802,7 +826,9 @@
           "after": "070c839e2c00e2d5f7c5d82307ca3d84dbb2323e46979daf265908751bbe8ae8",
           "before": "1a3ae58f9b4493e15459cc5000ec80f21b5d3f4a9dea6ffb6bc28e5b8817ae8a"
         }
-      }
+      },
+      "0.2.2-rc.2": false,
+      "0.2.2-rc.3": false
     },
     "zzzzzzz-plugin-list-index.diff": {
       "0.2.1-rc.4": {
@@ -830,7 +856,9 @@
           "after": "41079aff8f543ddab5b3f00b4cac222b87da9fc093400f1a63b45f6e585e9fcd",
           "before": "7365e9c7ce8442bb11df4c94a0c0f152be5fb18001dc60c740d07224bb80da18"
         }
-      }
+      },
+      "0.2.2-rc.2": false,
+      "0.2.2-rc.3": false
     },
     "zzzzzzz-prompt-tool-order.diff": {
       "0.2.1-rc.4": {
@@ -844,7 +872,9 @@
           "after": "ac76c82502d6888371869c3d48c4f1950ce377c4a4457cd89951f9461725fb03",
           "before": "18b692b03bbb717589085f63b126cbcf22963763c5a0565bb3a7a5d254e8e4a7"
         }
-      }
+      },
+      "0.2.2-rc.2": false,
+      "0.2.2-rc.3": false
     },
     "zzzzzzz-query-open-retry.diff": {
       "0.2.1-rc.4": {
@@ -858,7 +888,9 @@
           "after": "f21d9f8742c86c55220ecb5808ef55571c9ad82de16d9efe89d317bb325c7a28",
           "before": "8155a474260312831115094a17c31060a03942851e58cca234c0e86c610299e8"
         }
-      }
+      },
+      "0.2.2-rc.2": false,
+      "0.2.2-rc.3": false
     },
     "zzzzzzz-reference-drop-size.diff": {
       "0.2.1-rc.4": {
@@ -872,7 +904,9 @@
           "after": "f035912871a9c82a76a495e5bb3eefd43302821095153ff9b09c79060f3c75dd",
           "before": "cd7e925c56fe2a0725192ae14d07dea7dc2c6be1f6a8f099f32673d3053346fd"
         }
-      }
+      },
+      "0.2.2-rc.2": false,
+      "0.2.2-rc.3": false
     },
     "zzzzzzz-reference-encoding.diff": {
       "0.2.1-rc.4": {
@@ -886,7 +920,9 @@
           "after": "58e98b0ffe8d81870e12401be52dc2919d448413de376927a70c374db3f19f05",
           "before": "f035912871a9c82a76a495e5bb3eefd43302821095153ff9b09c79060f3c75dd"
         }
-      }
+      },
+      "0.2.2-rc.2": false,
+      "0.2.2-rc.3": false
     },
     "zzzzzzz-retainer-decode-copy.diff": {
       "0.2.1-rc.4": {
@@ -900,7 +936,9 @@
           "after": "e08b90d36da41a918c44060ea30971d54613c2538e323f404040c3c38985840a",
           "before": "de82f0000afe5b8cc846aa489ecebb589ed2fa7a1557290284bc8deae8ba9b27"
         }
-      }
+      },
+      "0.2.2-rc.2": false,
+      "0.2.2-rc.3": false
     },
     "zzzzzzz-settings-local-redaction.diff": {
       "0.2.1-rc.4": {
@@ -914,7 +952,9 @@
           "after": "d5b2a68d7d04b86d0798e2627a76bfb16b703fd1c08d57ae03a6ceee51add8dd",
           "before": "041a2682ed77a7025ceb9bf659b80db8b788c338cd1aa644f0bcc6bc122a4091"
         }
-      }
+      },
+      "0.2.2-rc.2": false,
+      "0.2.2-rc.3": false
     },
     "zzzzzzz-skill-watcher-recheck.diff": {
       "0.2.1-rc.4": {
@@ -928,7 +968,9 @@
           "after": "5000e40f6eb3b6416c741c8a7300d8427fb10a9a995649d3ed3cbe2e7d8bff5d",
           "before": "f1a7784f206f8d4d4805db4bc364b1db84f382ac352cc61652d96be4f8aef8a3"
         }
-      }
+      },
+      "0.2.2-rc.2": false,
+      "0.2.2-rc.3": false
     },
     "zzzzzzz-spill-write-cleanup.diff": {
       "0.2.1-rc.4": {
@@ -942,7 +984,9 @@
           "after": "c56338cbb612b1ba597a0971ec5528df5b496619aae58b3e57f0738632ef3fe2",
           "before": "c2f76196cdbab9acb72677aa77f17faa6b1b095bc46360cf44f0fed821ba3eb0"
         }
-      }
+      },
+      "0.2.2-rc.2": false,
+      "0.2.2-rc.3": false
     },
     "zzzzzzz-terminal-byte-length.diff": {
       "0.2.1-rc.4": {
@@ -956,7 +1000,9 @@
           "after": "65e58b624d4ab5d0bc8416faa3de664b2fdc34c600f5ee94e29e6f4e5bd08fbe",
           "before": "e75845292220ed21c0af6763ffa0a044d38f7b9b4d05c2b00248aea8718a7e83"
         }
-      }
+      },
+      "0.2.2-rc.2": false,
+      "0.2.2-rc.3": false
     },
     "zzzzzzz-time-zone-dedup.diff": {
       "0.2.1-rc.4": {
@@ -970,7 +1016,9 @@
           "after": "9a4a08f9183d53f89661a55f6e824ac3d5532252dadb2132f5ba2c9d654a6d55",
           "before": "8ef144d391269a00b43e561426b452a6f1b23a8397515e2fd3b88ddd20cac716"
         }
-      }
+      },
+      "0.2.2-rc.2": false,
+      "0.2.2-rc.3": false
     },
     "zzzzzzz-web-fetch-redirect-cleanup.diff": {
       "0.2.1-rc.4": {
@@ -984,7 +1032,9 @@
           "after": "7dc058bdab2cbbe56cbd56593b4f1a1270fcb066928fc1b05d7541cb18c72937",
           "before": "3d942c9d255ec3d479a405c13e5fa95d78d9a572179cfb0d894e1a9346259f83"
         }
-      }
+      },
+      "0.2.2-rc.2": false,
+      "0.2.2-rc.3": false
     },
     "zzzzzzz-workspace-observation-queue.diff": {
       "0.2.1-rc.4": {
@@ -998,7 +1048,9 @@
           "after": "1cdd038c3fd7ebc60642280a86ef6eadae43ff05a7bf7eb263a2e47d06676869",
           "before": "1d633aaf12df42e477438738f5939273ffc139ad96299ba471f97b46b2dd256c"
         }
-      }
+      },
+      "0.2.2-rc.2": false,
+      "0.2.2-rc.3": false
     },
     "zzzzzzzz-model-defaults.diff": {
       "0.2.1-rc.4": {
@@ -1020,7 +1072,9 @@
           "after": "518af5b4ec9470493829994c5430055b76c91637df49a59c846f83ac8c51208d",
           "before": "cd7fd35ee3f4cc3c0d8d6121361bf81fc12549ed04be12818ca00ba70ac70353"
         }
-      }
+      },
+      "0.2.2-rc.2": false,
+      "0.2.2-rc.3": false
     },
     "zzzzzzzz-schedule-authorization.diff": {
       "0.2.1-rc.4": {
@@ -1042,7 +1096,9 @@
           "after": "42988ed17a706b69a190db1117b7acf067a6a0418d778353ce247f874b6e646b",
           "before": "d6c3f9b7a3287b4dd15e8fd9573ba7ceb6ce45851c3a03772a3520b9634674fd"
         }
-      }
+      },
+      "0.2.2-rc.2": false,
+      "0.2.2-rc.3": false
     },
     "zzzzzzzzz-credentials-disposal.diff": {
       "0.2.1-rc.4": {
@@ -1056,7 +1112,9 @@
           "after": "46c193e78c39303bfe394e022c3f29d4734887f926682cd5efe9bdc8027cf77e",
           "before": "4c4c3af9ed5580d9b6105d8c1767a2a58e2e294b001e585032c2fd68b711dd9f"
         }
-      }
+      },
+      "0.2.2-rc.2": false,
+      "0.2.2-rc.3": false
     },
     "zzzzzzzzz-developer-header-lookup.diff": {
       "0.2.1-rc.4": {
@@ -1078,7 +1136,9 @@
           "after": "572eea7556695ae57b6dc25366aceb12241a4eda481b09a7aa986407d446e2f3",
           "before": "ebe8920a22fca8d987cbacab94c9db92f71df44863f58370a1be559155be734e"
         }
-      }
+      },
+      "0.2.2-rc.2": false,
+      "0.2.2-rc.3": false
     },
     "zzzzzzzzz-job-result-bytes.diff": {
       "0.2.1-rc.4": {
@@ -1092,7 +1152,9 @@
           "after": "4665ff461072a1b26c163c17d8bd9d6b5d1a2ff81e8c8fcda7515ba5a5919c2b",
           "before": "7461570ac5d29f85b27b228d551911f392e5082651e93b83723b77e9b87de0b6"
         }
-      }
+      },
+      "0.2.2-rc.2": false,
+      "0.2.2-rc.3": false
     },
     "zzzzzzzzz-materialize-temp.diff": {
       "0.2.1-rc.4": {
@@ -1106,7 +1168,9 @@
           "after": "cc1902a25ff5e1e4c66cef2ee26f97c0543a35687eac0159c4cb9f0bd5d5c25d",
           "before": "0c742ac1ed6b17e46e173af8e56abb2829c1ac66cc30b598c7e5a23f15b11e79"
         }
-      }
+      },
+      "0.2.2-rc.2": false,
+      "0.2.2-rc.3": false
     },
     "zzzzzzzzz-plugin-detail-body-cancel.diff": {
       "0.2.2-rc.1": {
@@ -1114,7 +1178,9 @@
           "after": "a82f66cb893c532708890a055c5a7bd4fdf3405381f3d962d7305ee5aa98ef85",
           "before": "47ee52c67c62b35af811e0fcc337622f835d1eee70ff5e78ef3f521df3849dee"
         }
-      }
+      },
+      "0.2.2-rc.2": false,
+      "0.2.2-rc.3": false
     },
     "zzzzzzzzz-plugin-manager-metadata-inventory.diff": {
       "0.2.2-rc.1": {
@@ -1144,7 +1210,9 @@
           "after": "91b8796478bcd83d98ebfa7bb0ec4ea6c0110649a1dcf835cc3e3d868aea001c",
           "before": "20151750f92c30f27132212d1911b9ce8036b895e6f28e96f52e0511f80e759c"
         }
-      }
+      },
+      "0.2.2-rc.2": false,
+      "0.2.2-rc.3": false
     },
     "zzzzzzzzz-session-event-admission.diff": {
       "0.2.1-rc.4": {
@@ -1158,7 +1226,9 @@
           "after": "d5c002ecc2060af4a712028ba060fc82d3c71918536bb070701188becfb7f155",
           "before": "9d87f606be2329d14c2dd5ed4115ae2264feade94011e685cfa814e3336dc0a3"
         }
-      }
+      },
+      "0.2.2-rc.2": false,
+      "0.2.2-rc.3": false
     },
     "zzzzzzzzz-session-id-membership.diff": {
       "0.2.1-rc.4": {
@@ -1172,7 +1242,9 @@
           "after": "e93cf89b4a677d828a16774f7dbc3b3ced87a896079420c3998628a6b4541a82",
           "before": "9cefdbb5d7c2a3af2784918f5370f4863c4ff8cf53545c971f1f7e3896b7cd0c"
         }
-      }
+      },
+      "0.2.2-rc.2": false,
+      "0.2.2-rc.3": false
     },
     "zzzzzzzzz-session-live-fingerprint.diff": {
       "0.2.2-rc.1": {
@@ -1180,7 +1252,9 @@
           "after": "df611a74e9110af10d2716a09ec8c67ba9f7d4e51d1edddc68e80d12c8d106f3",
           "before": "f21d9f8742c86c55220ecb5808ef55571c9ad82de16d9efe89d317bb325c7a28"
         }
-      }
+      },
+      "0.2.2-rc.2": false,
+      "0.2.2-rc.3": false
     },
     "zzzzzzzzz-stats-attempt-token.diff": {
       "0.2.1-rc.4": {
@@ -1194,7 +1268,9 @@
           "after": "415022b9305f021b7a007b7bf249b4799b35956a95d0590531d154b6aa2ec8d7",
           "before": "d4599ba27785d98b0269bb6cbd7340fe2789df76d73e6897f9e5dcec41e92e2a"
         }
-      }
+      },
+      "0.2.2-rc.2": false,
+      "0.2.2-rc.3": false
     },
     "zzzzzzzzz-subprocess-idle-read.diff": {
       "0.2.2-rc.1": {
@@ -1202,7 +1278,9 @@
           "after": "759d7894e3865c09121d729e72d32ef1cdf76c72004646e9164348d58db635b9",
           "before": "4f77ef6da608d36df168c99177e9b527e7145df1418845eba567635e64a4c2a3"
         }
-      }
+      },
+      "0.2.2-rc.2": false,
+      "0.2.2-rc.3": false
     },
     "zzzzzzzzz-subprocess-utf8-cursor.diff": {
       "0.2.2-rc.1": {
@@ -1210,7 +1288,9 @@
           "after": "8b37d86dbfc0b3ac3e47dc77e6a62ccea4307f08b57538c85a2aff5a30e6e724",
           "before": "759d7894e3865c09121d729e72d32ef1cdf76c72004646e9164348d58db635b9"
         }
-      }
+      },
+      "0.2.2-rc.2": false,
+      "0.2.2-rc.3": false
     },
     "zzzzzzzzz-subprocess-zsingle-read.diff": {
       "0.2.2-rc.1": {
@@ -1218,7 +1298,9 @@
           "after": "7becaaeca0f06e39eccb6cd35c059554da862589ef6526c40a3efaef67c63aa4",
           "before": "8b37d86dbfc0b3ac3e47dc77e6a62ccea4307f08b57538c85a2aff5a30e6e724"
         }
-      }
+      },
+      "0.2.2-rc.2": false,
+      "0.2.2-rc.3": false
     },
     "zzzzzzzzz-subprocess-zzspill-write-all.diff": {
       "0.2.2-rc.1": {
@@ -1226,7 +1308,9 @@
           "after": "da4597527245721a1860c9d09049e7da61168deb6287f3a67180f095634b0e76",
           "before": "7becaaeca0f06e39eccb6cd35c059554da862589ef6526c40a3efaef67c63aa4"
         }
-      }
+      },
+      "0.2.2-rc.2": false,
+      "0.2.2-rc.3": false
     },
     "zzzzzzzzz-subprocess-zzzero-tail.diff": {
       "0.2.2-rc.1": {
@@ -1248,7 +1332,9 @@
           "after": "20d5ffd566a0cbd4b2b3056d543c343db3c13f63b778bba9c4e5ad6a3f838a78",
           "before": "5f018757298e7a1995e2f8d7c47ecd7f016207da1d078394a3c6b38b13ae048b"
         }
-      }
+      },
+      "0.2.2-rc.2": false,
+      "0.2.2-rc.3": false
     },
     "zzzzzzzzz-tool-history-lookup.diff": {
       "0.2.1-rc.4": {
@@ -1262,7 +1348,9 @@
           "after": "442c6d710f300b4fc32d17a59d99bfd9c7fe35e46654cf211cdec8e0c8be1575",
           "before": "d5c002ecc2060af4a712028ba060fc82d3c71918536bb070701188becfb7f155"
         }
-      }
+      },
+      "0.2.2-rc.2": false,
+      "0.2.2-rc.3": false
     },
     "zzzzzzzzz-workspace-domain-close.diff": {
       "0.2.1-rc.4": {
@@ -1276,7 +1364,9 @@
           "after": "97d891ee0bc2ee8a1867a3c2420cf3ea8787b8000293771244f923de3b362658",
           "before": "a26b396baee3c353b5bd55c932e30f2653b083a136e7a8f9f596e9fe4c1222b0"
         }
-      }
+      },
+      "0.2.2-rc.2": false,
+      "0.2.2-rc.3": false
     },
     "zzzzzzzzzz-agent-team-input-recovery.diff": {
       "0.2.2-rc.1": {
@@ -1284,7 +1374,9 @@
           "after": "8a9443665d439b5c1aee020a53896e1365439ed3b17df39e0cd302f3fbf187bf",
           "before": "d5ed602b92410d40b1350185fd48cf1cefb9f606fb0a69351a10e12204afc3a2"
         }
-      }
+      },
+      "0.2.2-rc.2": false,
+      "0.2.2-rc.3": false
     },
     "zzzzzzzzzz-plugin-manager-log-write-all.diff": {
       "0.2.2-rc.1": {
@@ -1296,7 +1388,9 @@
           "after": "5886367b89cde0db08f4f9645afeb6c8a21ecb0be8a3f92d2459b433c9019661",
           "before": "0a6b2887b6e9c651d54707fb2a13f2def335c44881ba6cfd483d97a053314f9e"
         }
-      }
+      },
+      "0.2.2-rc.2": false,
+      "0.2.2-rc.3": false
     },
     "zzzzzzzzzz-plugin-update-selection.diff": {
       "0.2.2-rc.1": {
@@ -1304,7 +1398,9 @@
           "after": "b06115d4be25870377f887dcad715f388414d3284198a51ad58e7d96bdc189f1",
           "before": "bc5c879660f094db2db05bedf986e66dea7567e9ef57fab46588078ae1165164"
         }
-      }
+      },
+      "0.2.2-rc.2": false,
+      "0.2.2-rc.3": false
     },
     "zzzzzzzzzz-session-export-descendant-refs.diff": {
       "0.2.2-rc.1": {
@@ -1312,7 +1408,9 @@
           "after": "d2f855e6fbf65df195fb17d47d5611c737c88e636909802fa98472c30c5dc773",
           "before": "1659130631f989bdd4856dde0497e9826393c55c15ab7c17d9be37f56f2b13f7"
         }
-      }
+      },
+      "0.2.2-rc.2": false,
+      "0.2.2-rc.3": false
     },
     "zzzzzzzzzz-terminal-readiness-clock.diff": {
       "0.2.2-rc.1": {
@@ -1320,7 +1418,9 @@
           "after": "ccdf61346ef620db66886ba835377eb7e1300dc942b4fe7e881d13f9f15fbded",
           "before": "20d5ffd566a0cbd4b2b3056d543c343db3c13f63b778bba9c4e5ad6a3f838a78"
         }
-      }
+      },
+      "0.2.2-rc.2": false,
+      "0.2.2-rc.3": false
     },
     "zzzzzzzzzz-workspace-watch-error.diff": {
       "0.2.2-rc.1": {
@@ -1328,7 +1428,9 @@
           "after": "8f0f14f1699e177509f421466ad28a5b84f4274610f58b4ab84b536f1e59439a",
           "before": "1cdd038c3fd7ebc60642280a86ef6eadae43ff05a7bf7eb263a2e47d06676869"
         }
-      }
+      },
+      "0.2.2-rc.2": false,
+      "0.2.2-rc.3": false
     },
     "zzzzzzzzzzz-plugin-operations-log-utf8.diff": {
       "0.2.2-rc.1": {
@@ -1336,7 +1438,9 @@
           "after": "c7d72b35b81443a16f6a57f91087ba2f88812d0e5db7b9cdf131d852adcff9c8",
           "before": "5886367b89cde0db08f4f9645afeb6c8a21ecb0be8a3f92d2459b433c9019661"
         }
-      }
+      },
+      "0.2.2-rc.2": false,
+      "0.2.2-rc.3": false
     },
     "zzzzzzzzzzz-plugin-update-precondition.diff": {
       "0.2.2-rc.1": {
@@ -1352,7 +1456,9 @@
           "after": "e6326e2ac1756bdc947a3690f1e212a6b6b680c3c76ec40468a3d7b63af0608a",
           "before": "5f9ee37cd7bc3922c05148504700ac25eb2179099d494c5721380cd71363ced0"
         }
-      }
+      },
+      "0.2.2-rc.2": false,
+      "0.2.2-rc.3": false
     },
     "zzzzzzzzzzzz-plugin-update-hmr-selection.diff": {
       "0.2.2-rc.1": {
@@ -1360,7 +1466,9 @@
           "after": "9ceed37dfa542629510bff823c7da5002ed2981971cae627237bea2268152dac",
           "before": "be7a7d95482424bd9edacf5d057e203672651e0f4647e422c9b10fb5264fb1e3"
         }
-      }
+      },
+      "0.2.2-rc.2": false,
+      "0.2.2-rc.3": false
     },
     "zzzzzzzzzzzzz-plan-failed-command-pending.diff": {
       "0.2.2-rc.1": {
@@ -1368,7 +1476,9 @@
           "after": "c60a770d64661cdc7131a9e27f960f6596ca41c8c51c2dfc5887276b9be44cdd",
           "before": "e6326e2ac1756bdc947a3690f1e212a6b6b680c3c76ec40468a3d7b63af0608a"
         }
-      }
+      },
+      "0.2.2-rc.2": false,
+      "0.2.2-rc.3": false
     },
     "zzzzzzzzzzzzz-plugin-update-hmr-precondition.diff": {
       "0.2.2-rc.1": {
@@ -1376,7 +1486,9 @@
           "after": "d793a2eee744a2f0e183d2193933bad38425787854a0eaf67a40406ad42ad59a",
           "before": "9ceed37dfa542629510bff823c7da5002ed2981971cae627237bea2268152dac"
         }
-      }
+      },
+      "0.2.2-rc.2": false,
+      "0.2.2-rc.3": false
     },
     "zzzzzzzzzzzzzz-plugin-manager-lock-lifetime.diff": {
       "0.2.2-rc.1": {
@@ -1392,7 +1504,9 @@
           "after": "7146aa67fa9c1df61fc5472f6c52d814ef9e6ee41afcaca5f07c8ed7da175fae",
           "before": "0e866969b6bf1aa93407ccd9c944b50bc27a1d961b7e4209ed60bd2b73d28805"
         }
-      }
+      },
+      "0.2.2-rc.2": false,
+      "0.2.2-rc.3": false
     },
     "zzzzzzzzzzzzzzz-workflow-result-unicode.diff": {
       "0.2.2-rc.1": {
@@ -1400,7 +1514,9 @@
           "after": "e8f701007332dbd36ce764608a434db6a4ab5387c71570b05e221a8daac3adc3",
           "before": "9d7ccb5238318aae82cbf6ae497f00c2b45e4afa29ed430c7b5c7e7e2cd409e4"
         }
-      }
+      },
+      "0.2.2-rc.2": false,
+      "0.2.2-rc.3": false
     },
     "zzzzzzzzzzzzzzzz-read-line-cr-truncation.diff": {
       "0.2.2-rc.1": {
@@ -1408,7 +1524,9 @@
           "after": "7272a6bfd420207046882ad93de64fd70146965e39b7f9c6ceefc6d1f64cc70e",
           "before": "7146aa67fa9c1df61fc5472f6c52d814ef9e6ee41afcaca5f07c8ed7da175fae"
         }
-      }
+      },
+      "0.2.2-rc.2": false,
+      "0.2.2-rc.3": false
     },
     "zzzzzzzzzzzzzzzzz-web-fetch-unicode.diff": {
       "0.2.2-rc.1": {
@@ -1420,7 +1538,9 @@
           "after": "4d6ebdc8be0404361aad52f75c4f4b3e264ba068dfaa0ba2a40f955d2337c064",
           "before": "7dc058bdab2cbbe56cbd56593b4f1a1270fcb066928fc1b05d7541cb18c72937"
         }
-      }
+      },
+      "0.2.2-rc.2": false,
+      "0.2.2-rc.3": false
     },
     "zzzzzzzzzzzzzzzzzz-skill-catalog-unicode.diff": {
       "0.2.2-rc.1": {
@@ -1428,7 +1548,9 @@
           "after": "2cb9d675b941690582dde93c810c6c269d7413e9d21c810a4f3fe560e89467e2",
           "before": "c41b4ea6843d7987927593a872777a7eddb348f66512c20209ab871ebf02a8b7"
         }
-      }
+      },
+      "0.2.2-rc.2": false,
+      "0.2.2-rc.3": false
     },
     "zzzzzzzzzzzzzzzzzzz-fs-text-bom.diff": {
       "0.2.2-rc.1": {
@@ -1444,7 +1566,9 @@
           "after": "828b8e84e5f922d3b3d137ada0be4df3187bc5c82bb51ec3fa3384ca3efbf60b",
           "before": "cc1902a25ff5e1e4c66cef2ee26f97c0543a35687eac0159c4cb9f0bd5d5c25d"
         }
-      }
+      },
+      "0.2.2-rc.2": false,
+      "0.2.2-rc.3": false
     },
     "zzzzzzzzzzzzzzzzzzzzz-turn-outline-unicode.diff": {
       "0.2.2-rc.1": {
@@ -1452,7 +1576,9 @@
           "after": "8df29b7ad951745340ec6d9a8af4abc77bc9b9a3d570ce4e5b0dba30e60f0e7b",
           "before": "724f09b4c13de7cfb2b0a5ed5ccf776217e9e7d08ec6f458be8784e65069d78a"
         }
-      }
+      },
+      "0.2.2-rc.2": false,
+      "0.2.2-rc.3": false
     },
     "zzzzzzzzzzzzzzzzzzzzzz-context-summary-unicode.diff": {
       "0.2.2-rc.1": {
@@ -1460,7 +1586,9 @@
           "after": "2f3e4c549b158136d6355c6e29f25bc09e31c622f31dbbc2e82bab7cd537eda0",
           "before": "8e541fc98a11897706a122fde1db42f8b2a41b3b354ba3fcb932e9a16929ac6a"
         }
-      }
+      },
+      "0.2.2-rc.2": false,
+      "0.2.2-rc.3": false
     },
     "zzzzzzzzzzzzzzzzzzzzzzz-image-display-name-unicode.diff": {
       "0.2.2-rc.1": {
@@ -1468,7 +1596,9 @@
           "after": "393dd55f0e5967626b5657c27b88f5eb0383bc54bb8a751a9e5b5d9596fb8202",
           "before": "ff717f87226b59d6224aff67796b43d5fd72b98d0e74fa91a952affaf3285f9d"
         }
-      }
+      },
+      "0.2.2-rc.2": false,
+      "0.2.2-rc.3": false
     },
     "zzzzzzzzzzzzzzzzzzzzzzzz-ralph-result-unicode.diff": {
       "0.2.2-rc.1": {
@@ -1476,7 +1606,9 @@
           "after": "b3fb4b6dc932b3020d22e5d2427e912463a56f92471b21ed9a30ff6d857f7c8a",
           "before": "ad2f2f60dc65faae99bb1bd10417000e495a6febfb9abb747c4d39cfa80143b7"
         }
-      }
+      },
+      "0.2.2-rc.2": false,
+      "0.2.2-rc.3": false
     },
     "zzzzzzzzzzzzzzzzzzzzzzzzz-repeat-json-own-key.diff": {
       "0.2.2-rc.1": {
@@ -1484,7 +1616,9 @@
           "after": "c27587fc302f45c9ea6863bfaa2f96894a8a67e894ddfd74cf02477a79ab67e5",
           "before": "6d582ef007597eacd69f81a044424107f564ec3a5ad0b04ebe031d80f14488a8"
         }
-      }
+      },
+      "0.2.2-rc.2": false,
+      "0.2.2-rc.3": false
     },
     "zzzzzzzzzzzzzzzzzzzzzzzzzz-repeat-preview-unicode.diff": {
       "0.2.2-rc.1": {
@@ -1512,7 +1646,9 @@
           "after": "62827d69b251c0ee88c35293257dc2480a276227c7da01d6a21ab986936c9b05",
           "before": "fd735487e2053434485efca3af8ee75f026ad23ed475136fd62864c5e0b41583"
         }
-      }
+      },
+      "0.2.2-rc.2": false,
+      "0.2.2-rc.3": false
     },
     "zzzzzzzzzzzzzzzzzzzzzzzzzzzz-tool-result-codepoint-count.diff": {
       "0.2.2-rc.1": {

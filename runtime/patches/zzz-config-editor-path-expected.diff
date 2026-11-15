@@ -1,11 +1,12 @@
 --- a/node_modules/@deepseek-ai/dsh-config-editor/lib/index.js
 +++ b/node_modules/@deepseek-ai/dsh-config-editor/lib/index.js
-@@ -4,4 +4,3 @@
- import { Service, resolveConfig } from "@deepseek-ai/cordis";
+@@ -4,5 +4,4 @@
+ import { Service } from "@deepseek-ai/cordis";
 -import { entryListSchema } from "@deepseek-ai/cordis-plugin-include";
 -import yaml from "js-yaml";
  import { composeEntries, loadProfileDirectory, readProfilePatches, reconcileProfilePatches } from "@deepseek-ai/dsh-app-boot";
 +import { composeEntries, loadProfileDirectory, parsePatchList, readProfilePatches, reconcileProfilePatches } from "@deepseek-ai/dsh-app-boot";
+ import { withFileLock, writeFileAtomic } from "@deepseek-ai/dsh-atomic-write";
 @@ -112,6 +111,6 @@
  				const profile = this.ownerContext.profileContext;
  				const patches = readProfilePatches("dsh", profile, {

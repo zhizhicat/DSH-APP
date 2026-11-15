@@ -375,16 +375,17 @@ def cmd_patch_dsh(args):
     # idempotent input. Never accept an arbitrary intermediate/custom hash.
     terminal = {}
     after_positions = {}
-    if not args.record:
-        for position, name in enumerate(names):
-            version_pins = pins["patches"].get(name, {}).get(args.dsh_version, {})
-            if version_pins is False:
-                continue  # whole patch marked N/A for this DSH version
-            for rel, pin in version_pins.items():
-                if rel in terminal and terminal[rel] != pin["before"]:
-                    sys.exit("%s: broken patch hash chain for %s" % (name, rel))
-                terminal[rel] = pin["after"]
-                after_positions.setdefault(rel, {})[pin["after"]] = position
+    # Build the chain in record mode too: incremental pin saves mean a re-run
+    # sees already-patched files and must recognize them, not re-apply.
+    for position, name in enumerate(names):
+        version_pins = pins["patches"].get(name, {}).get(args.dsh_version, {})
+        if not isinstance(version_pins, dict):
+            continue  # whole patch marked N/A (False) for this DSH version
+        for rel, pin in version_pins.items():
+            if rel in terminal and terminal[rel] != pin["before"]:
+                sys.exit("%s: broken patch hash chain for %s" % (name, rel))
+            terminal[rel] = pin["after"]
+            after_positions.setdefault(rel, {})[pin["after"]] = position
     applied = []
     for position, name in enumerate(names):
         diff = parse_unified_diff(open(os.path.join(args.patches, name)).read())
@@ -407,7 +408,7 @@ def cmd_patch_dsh(args):
             if not args.record:
                 if pin is None:
                     sys.exit("%s: no pin for %s" % (name, rel))
-                if after_positions[rel].get(before, -1) >= position:
+                if after_positions.get(rel, {}).get(before, -1) >= position:
                     print("%s: %s already patched" % (name, rel))
                     observed[rel] = pin
                     continue
@@ -428,6 +429,12 @@ def cmd_patch_dsh(args):
             print("%s: patched %s (%s -> %s)" % (name, rel, before[:12], after[:12]))
         if args.record:
             pins["patches"].setdefault(name, {})[args.dsh_version] = observed
+            # Incremental save: a later patch failure must not lose the pins
+            # already recorded this run (re-runs would re-apply patched files
+            # with no pin to recognize them, and sweep would mis-N/A them).
+            with open(pins_path, "w") as f:
+                json.dump(pins, f, indent=2, sort_keys=True)
+                f.write("\n")
         applied.append(name)
     if args.record:
         with open(pins_path, "w") as f:
