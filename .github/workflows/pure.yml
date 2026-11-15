@@ -41,12 +41,7 @@ jobs:
           skip=false
           if gh release download runtime-layers -p layers-index.json -O published-index.json 2>/dev/null \
              && [[ -s published-index.json ]]; then
-            if python3 -c "
-import json,sys
-idx=json.load(open('published-index.json'))
-keys=idx['layers'].get('engine',{})
-sys.exit(0 if ('$ver' in keys or '$ver-pure' in keys) else 1)
-"; then
+            if jq -e --arg v "$ver" '.layers.engine | has($v) or has($v + "-pure")' published-index.json >/dev/null; then
               echo "already published ($ver or $ver-pure in index) — skip"
               skip=true
             fi
