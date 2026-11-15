@@ -28,6 +28,7 @@ jobs:
       skip: ${{ steps.check.outputs.skip }}
     steps:
       - name: Check upstream vs published index
+        id: check
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
