@@ -35,8 +35,8 @@ internal class RuntimeDownloader(
         outFile: File,
         expectedSha256: String? = null,
         expectedBytes: Long = -1L,
-        onProgress: (read: Long, total: Long) -> Unit = { _, _ -> },
         force: Boolean = false,
+        onProgress: (read: Long, total: Long) -> Unit = { _, _ -> },
     ): Result {
         outFile.parentFile?.mkdirs()
         val part = File(outFile.parentFile, outFile.name + ".part")
