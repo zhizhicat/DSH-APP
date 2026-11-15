@@ -259,48 +259,34 @@ class _PhoneDndPageState extends ConsumerState<PhoneDndPage> {
           if (!bg.effectiveReady && !waiting)
             PhoneNote(tone: NoteTone.warn, text: bg.effectiveReason ?? l10n.phoneNotReadyYet),
         ],
-        if (_error case final error? when error != bg.effectiveReason) PhoneNote(tone: NoteTone.warn, text: error),
-        if (bg.keep.enabled && _keepStatus(bg.keep).$1 != null)
-          PhoneNote(
-            tone: bg.keep.phase == PhoneKeepPhase.failed ? NoteTone.warn : NoteTone.info,
-            text: _keepStatus(bg.keep).$1!,
-          ),
-        if (using != PhonePrivilegedMode.off) ListPageCard(margin: _groupMargin, children: _channel(using, bg, open)),
-        if (using == PhonePrivilegedMode.off)
-          ...choices
-        else
-          PhoneOptionsFold(
-            key: const ValueKey('phone-dnd-channels'),
-            title: l10n.phoneDndChangeChannel,
-            children: choices,
-          ),
-        PhoneOptionsFold(
-          key: const ValueKey('phone-dnd-options'),
-          title: l10n.phoneControlAdvanced,
-          children: [
-            if (using != PhonePrivilegedMode.off && bg.privileged != null)
-              ListPageCard(margin: _groupMargin, children: [_keepRow(using, bg.keep)]),
-            if (bg.parallelism case final capacity? when status.ready)
-              ListPageCard(
-                margin: _groupMargin,
-                title: l10n.phoneBackgroundParallelTitle,
-                children: [
-                  ListPageRow(
-                    title: l10n.phoneBackgroundParallelStatus(
-                      capacity.configuredLimit,
-                      capacity.effectiveLimit,
-                      capacity.heldSlots,
-                    ),
-                    titleMaxLines: 4,
-                    subtitle: switch (capacity.reason) {
-                      'off' => l10n.phoneBackgroundParallelOff,
-                      'unsupported' => l10n.phoneBackgroundParallelUnsupported,
-                      'connectionRequired' => l10n.phoneBackgroundParallelConnection,
-                      'busy' => l10n.phoneBackgroundParallelBusy,
-                      'transportSerial' => l10n.phoneBackgroundParallelSerial,
-                      _ => l10n.phoneBackgroundParallelDescription,
-                    },
-                    subtitleMaxLines: 5,
+        if (bg.parallelism case final capacity? when status.ready)
+          ListPageCard(
+            margin: _groupMargin,
+            title: l10n.phoneBackgroundParallelTitle,
+            children: [
+              ListPageRow(
+                title: l10n.phoneBackgroundParallelStatus(capacity.configuredLimit, capacity.effectiveLimit, capacity.heldSlots),
+                titleMaxLines: 4,
+                subtitle: switch (capacity.reason) {
+                  'off' => l10n.phoneBackgroundParallelOff,
+                  'unsupported' => l10n.phoneBackgroundParallelUnsupported,
+                  'connectionRequired' => l10n.phoneBackgroundParallelConnection,
+                  'busy' => l10n.phoneBackgroundParallelBusy,
+                  'transportSerial' => l10n.phoneBackgroundParallelSerial,
+                  _ => l10n.phoneBackgroundParallelDescription,
+                },
+                subtitleMaxLines: 5,
+              ),
+              for (final limit in const [1, 2, 3])
+                Semantics(
+                  selected: capacity.configuredLimit == limit,
+                  inMutuallyExclusiveGroup: true,
+                  child: ListPageRow(
+                    key: ValueKey('phone-background-limit-$limit'),
+                    leading: Icon(capacity.configuredLimit == limit ? AppIcons.radioOn : AppIcons.radioOff),
+                    title: l10n.phoneBackgroundParallelChoice(limit),
+                    onTap: !_ready || _busy || capacity.configuredLimit == limit ? null : () =>
+                      unawaited(_run(() => _phone.setBackgroundParallelLimit(limit))),
                   ),
                 ),
             ],

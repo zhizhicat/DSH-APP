@@ -5,8 +5,6 @@ import 'package:http/http.dart' as http;
 
 import '../api.dart';
 
-part 'model_metadata.dart';
-
 /// The transport contract is OpenAI Chat Completions. DeepSeek's beta endpoint,
 /// prefix, reasoning_content and usage fields follow its published API:
 /// https://api-docs.deepseek.com/api/create-chat-completion/
@@ -37,7 +35,6 @@ class ModelToolFragment extends ModelDelta {
     this.name,
     this.arguments,
     List<Map<String, Object?>> issues = const [],
-    this.structure,
   }) : _issues = jsonEncode(issues);
 
   final int? index;
@@ -45,7 +42,6 @@ class ModelToolFragment extends ModelDelta {
   final String? type;
   final String? name;
   final String? arguments;
-  final ModelToolFragmentStructure? structure;
   final String _issues;
 
   /// Every read is detached, including nested diagnostic metadata.
@@ -55,16 +51,13 @@ class ModelToolFragment extends ModelDelta {
 }
 
 class ModelUsage extends ModelDelta {
-  const ModelUsage(this.usage, {this.report});
+  const ModelUsage(this.usage);
   final TavernUsage usage;
-  final ModelUsageReport? report;
 }
 
 class ModelFinished extends ModelDelta {
-  const ModelFinished(this.reason, {this.assistantSnapshot, this.finalUsageReport});
+  const ModelFinished(this.reason);
   final String? reason;
-  final ModelAssistantSnapshot? assistantSnapshot;
-  final ModelUsageReport? finalUsageReport;
 }
 
 class TavernModelException implements Exception {
@@ -107,51 +100,6 @@ class ModelCancellation {
   }
 }
 
-/// A single request's raw-usage observation scope over the original token.
-/// All cancellation operations delegate; closing observations neither cancels
-/// that token nor erases already recorded evidence. Legacy generate overrides
-/// still accept this through their unchanged ModelCancellation parameter.
-class ModelRequestContext extends ModelCancellation {
-  ModelRequestContext({required ModelCancellation cancellation, required void Function(ModelUsageReport) onUsageReport})
-    : _cancellation = cancellation,
-      _onUsageReport = onUsageReport;
-
-  final ModelCancellation _cancellation;
-  final void Function(ModelUsageReport) _onUsageReport;
-  var _observationsClosed = false;
-
-  @override
-  bool get isCancelled => _cancellation.isCancelled;
-  @override
-  Future<void> get whenCancelled => _cancellation.whenCancelled;
-  @override
-  void cancel() => _cancellation.cancel();
-  @override
-  void check() => _cancellation.check();
-  @override
-  Future<T> wait<T>(Future<T> operation) => _cancellation.wait(operation);
-
-  /// Called synchronously when the actual report is observed, before outward
-  /// response deltas. The owner handles its persistence failure separately;
-  /// an observer cannot replace a transport error or change retry behavior.
-  void reportUsage(ModelUsageReport report) {
-    if (_observationsClosed) return;
-    try {
-      _onUsageReport(report);
-    } catch (_) {
-      /* observation only */
-    }
-  }
-
-  void closeObservations() {
-    _observationsClosed = true;
-  }
-}
-
-void _observeUsage(ModelCancellation cancellation, ModelUsageReport report) {
-  if (cancellation is ModelRequestContext) cancellation.reportUsage(report);
-}
-
 /// An HTTP client is owned by each call so stopping one chat cannot abort a
 /// different chat. Supply [clientFactory] for deterministic transport tests.
 class TavernModelClient {
@@ -162,8 +110,7 @@ class TavernModelClient {
   final Duration idleTimeout;
 
   /// [body] is the final, inspected request from the assembler. This method
-  /// supplies transport settings and removes DeepSeek-only wire fields for
-  /// an OpenAI-compatible endpoint.
+  /// only supplies the configured model and transport stream setting.
   /// `stream: false` presets are also supported: one text/reasoning delta.
   /// Connection errors while sending and HTTP 5xx get at most two retries,
   /// after 250 and 500 ms. Accepted responses and 4xx are not retried; waiting
@@ -179,19 +126,16 @@ class TavernModelClient {
     String? key;
     try {
       cancellation.check();
-      final headers = Map<String, String>.of(config.headers);
       key = await cancellation.wait(config.apiKey());
       cancellation.check();
       key = key?.trim();
-      if (config.deepseek && (key == null || key.isEmpty)) {
+      if (key == null || key.isEmpty) {
         throw const TavernModelException(TavernFailure.noKey, 'no_api_key');
       }
       final payload = <String, Object?>{...body, 'model': config.model};
       payload.putIfAbsent('stream', () => true);
       if (config.deepseek) {
         payload.putIfAbsent('thinking', () => {'type': config.thinking ? 'enabled' : 'disabled'});
-      } else {
-        _normalizeOpenAiBody(payload);
       }
       final encodedBody = jsonEncode(payload);
       final uri = endpoint(config);
@@ -201,7 +145,6 @@ class TavernModelClient {
             config,
             uri,
             key,
-            headers,
             encodedBody,
             payload['stream'] != false,
             cancellation,
@@ -239,8 +182,7 @@ class TavernModelClient {
   Stream<ModelDelta> _generateAttempt(
     TavernModelConfig config,
     Uri uri,
-    String? key,
-    Map<String, String> headers,
+    String key,
     String encodedBody,
     bool streaming,
     ModelCancellation cancellation,
@@ -249,12 +191,7 @@ class TavernModelClient {
     try {
       cancellation.check();
       final request = http.AbortableRequest('POST', uri, abortTrigger: cancellation.whenCancelled)
-        ..headers.addAll({
-          'Content-Type': 'application/json',
-          for (final entry in headers.entries)
-            if (key == null || key.isEmpty || entry.key.toLowerCase() != 'authorization') entry.key: entry.value,
-          if (key != null && key.isNotEmpty) 'Authorization': 'Bearer $key',
-        })
+        ..headers.addAll({'Content-Type': 'application/json', 'Authorization': 'Bearer $key'})
         ..body = encodedBody;
       client = _clientFactory();
       cancellation.check();
@@ -278,7 +215,7 @@ class TavernModelClient {
           // interrupted. Do not substitute raw transport exception messages.
           error = 'error_response_body_unavailable';
         }
-        final failure = _apiError(response.statusCode, error, key, headers.values);
+        final failure = _apiError(response.statusCode, error, key);
         if (response.statusCode >= 500 && response.statusCode < 600) {
           throw _RetryableModelException(failure);
         }
@@ -289,27 +226,10 @@ class TavernModelClient {
         final text = await cancellation.wait(response.stream.bytesToString().timeout(idleTimeout));
         cancellation.check();
         final result = _object(jsonDecode(text));
-        ModelUsageReport? usageReport;
-        if (result.containsKey('usage')) {
-          usageReport = _providerUsageReport(
-            result['usage'],
-            present: true,
-            transport: 'nonstream',
-            observationIndex: 0,
-          );
-          _observeUsage(cancellation, usageReport);
-        }
-        if (result['error'] != null) throw _apiError(200, text, key, headers.values);
+        if (result['error'] != null) throw _apiError(200, text, key);
         final choice = _firstChoice(result);
         final message = _object(choice['message']);
-        // The complete nonstream body and actual message are already present.
-        // Do not fabricate absence for a malformed completion envelope.
-        if (usageReport == null && choice.isNotEmpty && message.isNotEmpty) {
-          usageReport = _providerUsageReport(null, present: false, transport: 'nonstream', observationIndex: 0);
-          _observeUsage(cancellation, usageReport);
-        }
-        final assistant = _AssistantCollector('nonstream_message')..add(message, streaming: false);
-        if (_reasoningText(message) case final String reasoning when reasoning.isNotEmpty) {
+        if (message['reasoning_content'] case final String reasoning when reasoning.isNotEmpty) {
           cancellation.check();
           yield ModelReasoning(reasoning);
         }
@@ -323,7 +243,7 @@ class TavernModelClient {
         }
         if (result['usage'] case final Map<String, dynamic> usage) {
           cancellation.check();
-          yield ModelUsage(_usage(usage, result['model'] as String? ?? config.model), report: usageReport);
+          yield ModelUsage(_usage(usage, result['model'] as String? ?? config.model));
         }
         if (choice.isEmpty || message.isEmpty) {
           throw const TavernModelException(TavernFailure.server, 'invalid_completion_response');
@@ -331,48 +251,24 @@ class TavernModelClient {
         final reason = choice['finish_reason'] as String?;
         _checkFinish(reason);
         cancellation.check();
-        yield ModelFinished(reason, assistantSnapshot: assistant.finish(), finalUsageReport: usageReport);
+        yield ModelFinished(reason);
         return;
       }
 
       String? finishReason;
       var sawFinish = false;
       var sawDone = false;
-      final assistant = _AssistantCollector('streaming_aggregate');
-      ModelUsageReport? usageReport;
-      var usageObservationIndex = 0;
       await for (final event in decodeServerSentEvents(response.stream.timeout(idleTimeout))) {
         cancellation.check();
         if (event == '[DONE]') {
           sawDone = true;
-          if (usageReport == null) {
-            usageReport = _providerUsageReport(
-              null,
-              present: false,
-              transport: 'streaming',
-              observationIndex: usageObservationIndex,
-            );
-            _observeUsage(cancellation, usageReport);
-          }
           break;
         }
         final data = _object(jsonDecode(event));
-        // Top-level presence is independent of choice/delta shape. Deliver it
-        // before this payload can yield text or fail on another response field.
-        if (data.containsKey('usage')) {
-          usageReport = _providerUsageReport(
-            data['usage'],
-            present: true,
-            transport: 'streaming',
-            observationIndex: usageObservationIndex++,
-          );
-          _observeUsage(cancellation, usageReport);
-        }
-        if (data['error'] != null) throw _apiError(200, event, key, headers.values);
+        if (data['error'] != null) throw _apiError(200, event, key);
         final choice = _firstChoice(data);
         final delta = _object(choice['delta']);
-        assistant.add(delta, streaming: true);
-        if (_reasoningText(delta) case final String reasoning when reasoning.isNotEmpty) {
+        if (delta['reasoning_content'] case final String reasoning when reasoning.isNotEmpty) {
           cancellation.check();
           yield ModelReasoning(reasoning);
         }
@@ -392,17 +288,8 @@ class TavernModelClient {
         // chunk. It must be read independently of the first choice.
         if (data['usage'] case final Map<String, dynamic> usage) {
           cancellation.check();
-          yield ModelUsage(_usage(usage, data['model'] as String? ?? config.model), report: usageReport);
+          yield ModelUsage(_usage(usage, data['model'] as String? ?? config.model));
         }
-      }
-      if (sawFinish && usageReport == null) {
-        usageReport = _providerUsageReport(
-          null,
-          present: false,
-          transport: 'streaming',
-          observationIndex: usageObservationIndex,
-        );
-        _observeUsage(cancellation, usageReport);
       }
       cancellation.check();
       if (!sawDone && !sawFinish) {
@@ -410,7 +297,7 @@ class TavernModelClient {
       }
       _checkFinish(finishReason);
       cancellation.check();
-      yield ModelFinished(finishReason, assistantSnapshot: assistant.finish(), finalUsageReport: usageReport);
+      yield ModelFinished(finishReason);
     } finally {
       client?.close();
     }
@@ -466,40 +353,6 @@ Map<String, Object?> _object(Object? value) {
   return const {};
 }
 
-// The transport boundary also covers custom callers of TavernModelClient.
-// Copy message/tool maps without mutating the caller's inspected body.
-void _normalizeOpenAiBody(Map<String, Object?> body) {
-  body.remove('thinking');
-  if (body['messages'] case final List<Object?> messages) {
-    body['messages'] = [
-      for (final message in messages)
-        if (message is Map<String, Object?>)
-          Map<String, Object?>.of(message)
-            ..remove('prefix')
-            ..remove('reasoning_content')
-            ..remove('reasoning')
-        else
-          message,
-    ];
-  }
-  if (body['tools'] case final List<Object?> tools) {
-    body['tools'] = [
-      for (final tool in tools)
-        if (tool is Map<String, Object?> && tool['function'] is Map<String, Object?>)
-          {...tool, 'function': Map<String, Object?>.of(tool['function']! as Map<String, Object?>)..remove('strict')}
-        else
-          tool,
-    ];
-  }
-}
-
-String? _reasoningText(Map<String, Object?> message) {
-  final content = message['reasoning_content'];
-  if (content is String && content.isNotEmpty) return content;
-  final alias = message['reasoning'];
-  return alias is String ? alias : null;
-}
-
 Map<String, Object?> _firstChoice(Map<String, Object?> response) {
   final choices = response['choices'];
   if (choices is! List<Object?> || choices.isEmpty) return const {};
@@ -519,7 +372,6 @@ Iterable<ModelToolFragment> _toolFragments(Object? value, {required bool streami
       issues: [
         {'code': 'invalid_tool_calls', 'field': 'tool_calls', 'message': 'Expected an array of tool calls.'},
       ],
-      structure: const ModelToolFragmentStructure(unsupportedEnvelope: true, invalidMetadataType: true),
     );
     return;
   }
@@ -537,16 +389,10 @@ Iterable<ModelToolFragment> _toolFragments(Object? value, {required bool streami
             'message': 'Expected a tool call object.',
           },
         ],
-        structure: const ModelToolFragmentStructure(unsupportedEnvelope: true, invalidMetadataType: true),
       );
       continue;
     }
     final issues = <Map<String, Object?>>[];
-    var invalidMetadata = false;
-    var invalidArguments = false;
-    var unsupported = item.keys.any(
-      (key) => !const ['id', 'type', 'function'].contains(key) && !(streaming && key == 'index'),
-    );
     int? index;
     if (!streaming) {
       index = ordinal;
@@ -568,11 +414,6 @@ Iterable<ModelToolFragment> _toolFragments(Object? value, {required bool streami
       if (raw is String) {
         return raw;
       }
-      if (path == 'function.arguments') {
-        invalidArguments = true;
-      } else {
-        invalidMetadata = true;
-      }
       issues.add({'code': 'invalid_field_type', 'field': path, 'index': ?index, 'message': 'Expected a string.'});
       return null;
     }
@@ -584,12 +425,9 @@ Iterable<ModelToolFragment> _toolFragments(Object? value, {required bool streami
     if (item.containsKey('function')) {
       final function = item['function'];
       if (function is Map<String, Object?>) {
-        unsupported = unsupported || function.keys.any((key) => !const ['name', 'arguments'].contains(key));
         name = field(function, 'name', 'function.name');
         arguments = field(function, 'arguments', 'function.arguments');
       } else {
-        invalidMetadata = true;
-        invalidArguments = true;
         issues.add({
           'code': 'invalid_field_type',
           'field': 'function',
@@ -598,19 +436,7 @@ Iterable<ModelToolFragment> _toolFragments(Object? value, {required bool streami
         });
       }
     }
-    yield ModelToolFragment(
-      index: index,
-      id: id,
-      type: type,
-      name: name,
-      arguments: arguments,
-      issues: issues,
-      structure: ModelToolFragmentStructure(
-        unsupportedEnvelope: unsupported,
-        invalidMetadataType: invalidMetadata,
-        invalidArgumentsType: invalidArguments,
-      ),
-    );
+    yield ModelToolFragment(index: index, id: id, type: type, name: name, arguments: arguments, issues: issues);
   }
 }
 
@@ -662,7 +488,7 @@ bool _isContextLengthError(String body) {
   }
 }
 
-TavernModelException _apiError(int status, String body, String? key, Iterable<String> headerValues) {
+TavernModelException _apiError(int status, String body, String key) {
   final kind = switch (status) {
     401 || 403 => TavernFailure.badKey,
     402 => TavernFailure.insufficientBalance,
@@ -672,19 +498,7 @@ TavernModelException _apiError(int status, String body, String? key, Iterable<St
     400 || 422 => TavernFailure.invalidParameters,
     _ => TavernFailure.server,
   };
-  var detail = body;
-  void redact(String value) {
-    if (value.isEmpty) return;
-    final encoded = jsonEncode(value);
-    detail = detail.replaceAll(value, '[redacted]').replaceAll(encoded.substring(1, encoded.length - 1), '[redacted]');
-  }
-
-  if (key != null) redact(key);
-  for (final value in headerValues) {
-    redact(value);
-    final separator = value.indexOf(' ');
-    if (separator >= 0) redact(value.substring(separator + 1));
-  }
+  var detail = body.replaceAll(key, '[redacted]');
   detail = detail.replaceAll(RegExp(r'Bearer\s+[^\s"<>]+', caseSensitive: false), 'Bearer [redacted]');
   if (detail.length > 512) detail = detail.substring(0, 512);
   return TavernModelException(kind, 'HTTP $status: $detail');

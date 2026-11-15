@@ -14,35 +14,19 @@ Map<String, Object?>? _storySnapshot(
   Map<String, Object?> data,
   Map<String, Object?> settings,
 ) {
-  final leaf = chat.currentLeafId;
-  final saved = engine._stateAt(chat.id, leaf);
-  final own = leaf == null ? <String, Object?>{} : _map(engine._store.node(chat.id, leaf).extra['dshgo']);
-  final historical = _gameplayHistoricalConfig(engine, saved);
-  if (historical.referenced && historical.config == null) {
-    return {
-      'unresolved': true,
-      'executable': false,
-      'valid': false,
-      'automaticEnabled': false,
-      'nodeId': leaf,
-      'runtimeExists': saved.containsKey(_storyRuntimeKey),
-      if (saved.containsKey(_storyRuntimeKey)) 'runtime': saved[_storyRuntimeKey],
-      'changes': _stateRows(own['storyChanges']),
-      'effects': _stateRows(own['storyEffects']),
-      'issues': [...historical.issues, ..._stateRows(own['storyIssues'])],
-    };
-  }
-  final definition = historical.config?.story ?? _storyDefinition(data);
+  final definition = _storyDefinition(data);
   if (!definition.defined) {
     return null;
   }
+  final leaf = chat.currentLeafId;
+  final saved = leaf == null ? <String, Object?>{} : engine._stateAt(chat.id, leaf);
+  final own = leaf == null ? <String, Object?>{} : _map(engine._store.node(chat.id, leaf).extra['dshgo']);
   final snapshot = definition.inspect(
     runtimeExists: saved.containsKey(_storyRuntimeKey),
     runtime: saved[_storyRuntimeKey],
   );
   return {
     ...snapshot.toJson(),
-    if (historical.config case final config?) 'effectiveConfigId': config.effectiveConfigId,
     'nodeId': leaf,
     'automaticEnabled': _map(settings['director'])['enabled'] == true,
     'changes': _stateRows(own['storyChanges']),
@@ -54,14 +38,9 @@ Map<String, Object?>? _storySnapshot(
 /// A helper retains its real input source. Phase is checked separately against
 /// the next main turn's context: ordinary turns within one act can reuse a
 /// result, while an intervening act completion or ending makes it obsolete.
-Map<String, Object?> _storyDirectorPhase(
-  story_core.StoryDefinition definition,
-  story_core.StorySnapshot snapshot, {
-  _GameplayRuntime? gameplay,
-}) => {
+Map<String, Object?> _storyDirectorPhase(story_core.StoryDefinition definition, story_core.StorySnapshot snapshot) => {
   'version': 1,
   'definitionFingerprint': definition.fingerprint,
-  if (gameplay != null) 'effectiveConfigId': gameplay.effectiveConfigId,
   'valid': snapshot.valid,
   'currentActId': snapshot.currentActId,
   'completed': snapshot.completed,
@@ -70,10 +49,9 @@ Map<String, Object?> _storyDirectorPhase(
 
 ({Map<String, Object?>? progress, Map<String, Object?>? phase}) _storyDirectorContext(
   Map<String, Object?> data,
-  Map<String, Object?> source, {
-  _GameplayRuntime? gameplay,
-}) {
-  final definition = gameplay?.story ?? _storyDefinition(data);
+  Map<String, Object?> source,
+) {
+  final definition = _storyDefinition(data);
   if (!definition.defined) {
     return (progress: null, phase: null);
   }
@@ -81,20 +59,16 @@ Map<String, Object?> _storyDirectorPhase(
     runtimeExists: source.containsKey('storyRuntime'),
     runtime: source['storyRuntime'],
   );
-  return (
-    progress: snapshot.toJson(),
-    phase: definition.executable ? _storyDirectorPhase(definition, snapshot, gameplay: gameplay) : null,
-  );
+  return (progress: snapshot.toJson(), phase: definition.executable ? _storyDirectorPhase(definition, snapshot) : null);
 }
 
 String? _storyDirectorEligibility(
   TavernEngine engine,
   StoredAgentRun stored,
   Map<String, Object?> data,
-  String? contextNodeId, {
-  _GameplayRuntime? gameplay,
-}) {
-  final definition = gameplay?.story ?? _storyDefinition(data);
+  String? contextNodeId,
+) {
+  final definition = _storyDefinition(data);
   if (!definition.defined) {
     return null;
   }
@@ -102,28 +76,11 @@ String? _storyDirectorEligibility(
     return 'director_story_unavailable';
   }
   final saved = contextNodeId == null ? <String, Object?>{} : engine._stateAt(stored.chatId, contextNodeId);
-  return _storyDirectorEligibilityFromState(stored, data, saved, definition: definition, gameplay: gameplay);
-}
-
-String? _storyDirectorEligibilityFromState(
-  StoredAgentRun stored,
-  Map<String, Object?> data,
-  Map<String, Object?> saved, {
-  story_core.StoryDefinition? definition,
-  _GameplayRuntime? gameplay,
-}) {
-  definition ??= gameplay?.story ?? _storyDefinition(data);
-  if (!definition.defined) {
-    return null;
-  }
-  if (!definition.executable) {
-    return 'director_story_unavailable';
-  }
   final snapshot = definition.inspect(
     runtimeExists: saved.containsKey(_storyRuntimeKey),
     runtime: saved[_storyRuntimeKey],
   );
-  final current = _storyDirectorPhase(definition, snapshot, gameplay: gameplay);
+  final current = _storyDirectorPhase(definition, snapshot);
   if (current['valid'] != true) {
     return 'director_story_unavailable';
   }
@@ -161,7 +118,7 @@ _StorySettlement? _settleStoryTurn(TavernEngine engine, _Turn turn, Map<String, 
   if (data == null) {
     return null;
   }
-  final definition = turn.gameplay?.story ?? _storyDefinition(data);
+  final definition = _storyDefinition(data);
   if (!definition.defined) {
     return null;
   }
@@ -172,11 +129,8 @@ _StorySettlement? _settleStoryTurn(TavernEngine engine, _Turn turn, Map<String, 
   final invocation = turn.storyInvocationId ??= _newStateId();
   final runId = '$invocation:story';
   final input = _StateInput(before);
-  final stateDefinition = turn.gameplay?.state ?? _stateDefinition(data);
-  final issues = <Map<String, Object?>>[
-    ...input.issues,
-    if (!turn.gameplayValueEligible) _directorIssue('story_gameplay_state_unavailable'),
-  ];
+  final stateDefinition = _stateDefinition(data);
+  final issues = <Map<String, Object?>>[...input.issues];
   Object? conditionState;
   if (stateDefinition.hasSchema) {
     if (!stateDefinition.executable) {
@@ -204,7 +158,6 @@ _StorySettlement? _settleStoryTurn(TavernEngine engine, _Turn turn, Map<String, 
   final next = _copy(before);
   if (accepted != null && accepted.runtimeExists) {
     next[_storyRuntimeKey] = accepted.runtime;
-    _stampGameplayConfig(turn.gameplay, next);
   }
   final changes = accepted?.changes ?? <Map<String, Object?>>[];
   final effects = accepted == null

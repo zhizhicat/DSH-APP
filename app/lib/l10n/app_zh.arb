@@ -7021,6 +7021,7 @@
   "phoneSkillReplayQueue": "发送路线（排队）",
   "phoneSkillReplayQueued": "路线消息已被接收或排队，尚不代表路线执行成功。",
   "phoneSkillReplaySendUncertain": "路线消息未确认发送成功；没有自动重新准备或重放。请核对原对话结果。",
+  "phoneSelfCheckRetry": "仅重试清理",
   "phoneTaskResultReady": "任务完成 · 查看结果",
   "phoneTaskEndedResult": "任务已结束 · 查看结果",
   "phoneBackgroundGuideTitle": "后台确认与返回",

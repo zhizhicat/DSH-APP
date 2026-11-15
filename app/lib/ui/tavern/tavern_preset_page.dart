@@ -23,7 +23,6 @@ import '../shell/page_frame.dart';
 import '../theme/app_icons.dart';
 import '../theme/theme.dart';
 import 'tavern_message_edit_page.dart';
-import 'tavern_number_tile.dart';
 import 'tavern_presets_page.dart';
 import 'tavern_stepper.dart';
 
@@ -101,17 +100,6 @@ List<TavernPresetPrompt> tavernPresetPrompts(Map<String, Object?> raw) {
   ];
 }
 
-/// A sampling number as a preset has it; ST writes some as strings ("0.9").
-/// An imported preset can say "Infinity": that is no setting either.
-num _number(Object? value, num fallback) => switch (value) {
-  final num n when n.isFinite => n,
-  final String s => switch (num.tryParse(s)) {
-    final n? when n.isFinite => n,
-    _ => fallback,
-  },
-  _ => fallback,
-};
-
 /// A prompt's text: its own, else the legacy top-level field ST keeps for the
 /// three classic prompts.
 String _contentOf(Map<String, Object?> raw, Map<String, Object?>? prompt, String id) => switch (prompt?['content']) {
@@ -173,39 +161,29 @@ class TavernPresetPage extends ConsumerWidget {
           title: l10n.tavernPresetParams,
           margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
           children: [
-            TavernNumberTile(
+            SettingsSegmentTile<int>(
               key: const ValueKey('tavern-preset-context'),
               icon: AppIcons.tavernContext,
               title: l10n.tavernMaxContext,
-              presets: tavernContextSizes,
-              presetLabel: tavernContextLabel,
-              value: numbers.maxContext,
-              min: tavernContextRange.min,
-              max: tavernContextRange.max,
-              integer: true,
-              onChanged: (t) => set(TavernGenerationController.contextKey, t.toInt()),
+              segments: [for (final t in tavernContextSizes) PillSegment(t, '${(t + 1) ~/ 1024}K')],
+              selected: numbers.maxContext,
+              onChanged: (t) => set(TavernGenerationController.contextKey, t),
             ),
-            TavernNumberTile(
+            SettingsSegmentTile<int>(
               key: const ValueKey('tavern-preset-reply'),
               icon: AppIcons.tavernReplyLength,
               title: l10n.tavernMaxReply,
-              presets: tavernReplySizes,
-              value: numbers.maxReply,
-              min: tavernReplyRange.min,
-              max: tavernReplyRange.max,
-              integer: true,
-              onChanged: (t) => set(TavernGenerationController.replyKey, t.toInt()),
+              segments: [for (final t in tavernReplySizes) PillSegment(t, '$t')],
+              selected: numbers.maxReply,
+              onChanged: (t) => set(TavernGenerationController.replyKey, t),
             ),
-            TavernNumberTile(
+            SettingsSegmentTile<double>(
               key: const ValueKey('tavern-preset-temperature'),
               icon: AppIcons.tavernTemperature,
               title: l10n.tavernTemperature,
-              presets: tavernTemperatures,
-              presetLabel: (t) => t.toStringAsFixed(1),
-              value: numbers.temperature,
-              min: tavernTemperatureRange.min,
-              max: tavernTemperatureRange.max,
-              onChanged: (t) => set(TavernGenerationController.temperatureKey, t.toDouble()),
+              segments: [for (final t in tavernTemperatures) PillSegment(t, t.toStringAsFixed(1))],
+              selected: numbers.temperature,
+              onChanged: (t) => set(TavernGenerationController.temperatureKey, t),
             ),
           ],
         ),
@@ -287,42 +265,6 @@ class TavernPresetPage extends ConsumerWidget {
                 title: l10n.tavernPresetOrder,
                 onTap: () => unawaited(showTavernPresetOrder(context, presetId, prompts)),
               ),
-          ],
-        ),
-        // The rest of what the preset sends, less often touched: last, in a
-        // group of their own, without icons.
-        SheetGroup(
-          key: const ValueKey('tavern-preset-sampling'),
-          title: l10n.tavernPresetSampling,
-          margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-          children: [
-            TavernNumberTile(
-              key: const ValueKey('tavern-preset-top-p'),
-              title: l10n.tavernTopP,
-              presets: tavernTopPs,
-              value: _number(raw['top_p'], 1),
-              min: tavernTopPRange.min,
-              max: tavernTopPRange.max,
-              onChanged: (v) => set('top_p', v.toDouble()),
-            ),
-            TavernNumberTile(
-              key: const ValueKey('tavern-preset-presence'),
-              title: l10n.tavernPresencePenalty,
-              presets: tavernPenalties,
-              value: _number(raw['presence_penalty'], 0),
-              min: tavernPenaltyRange.min,
-              max: tavernPenaltyRange.max,
-              onChanged: (v) => set('presence_penalty', v.toDouble()),
-            ),
-            TavernNumberTile(
-              key: const ValueKey('tavern-preset-frequency'),
-              title: l10n.tavernFrequencyPenalty,
-              presets: tavernPenalties,
-              value: _number(raw['frequency_penalty'], 0),
-              min: tavernPenaltyRange.min,
-              max: tavernPenaltyRange.max,
-              onChanged: (v) => set('frequency_penalty', v.toDouble()),
-            ),
           ],
         ),
       ],
