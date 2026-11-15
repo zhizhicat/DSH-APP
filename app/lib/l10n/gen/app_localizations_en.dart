@@ -23831,7 +23831,8 @@ class L10nEn extends L10n {
   @override
   String get tavernPackAuthorityConflict => 'The character\'s source changed; refresh and confirm again';
 
-  @override  String get updateCheck => 'Check for updates';
+  @override
+  String get updateCheck => 'Check for updates';
 
   @override
   String get updateAutoCheck => 'Check automatically';
@@ -27122,7 +27123,8 @@ class L10nEn extends L10n {
     return 'The submission records on this phone can\'t be read as a whole. Letting go removes the unfinished-submission records of every account on this phone, not just the one for this GitHub account at Workshop $worker.';
   }
 
-  @override  String get workspaceRecoveryTitle => 'Workspace index recovery';
+  @override
+  String get workspaceRecoveryTitle => 'Workspace index recovery';
 
   @override
   String get workspaceRecoveryEnable => 'Use a recovery workspace index';

@@ -22575,7 +22575,8 @@ class L10nZh extends L10n {
     return '用这份草稿的角色定义和全部 $n 处改动做一个新的 .dshpack';
   }
 
-  @override  String get updateCheck => '检查更新';
+  @override
+  String get updateCheck => '检查更新';
 
   @override
   String get updateAutoCheck => '自动检查更新';
@@ -25705,7 +25706,8 @@ class L10nZh extends L10n {
     return '这台手机上的投稿记录整体读不出来了。放下会清掉本机所有账号的未完成投稿记录，不只是这个 GitHub 账号在工坊 $worker 的这一条。';
   }
 
-  @override  String get workspaceRecoveryTitle => '工作区索引救援';
+  @override
+  String get workspaceRecoveryTitle => '工作区索引救援';
 
   @override
   String get workspaceRecoveryEnable => '启用工作区索引救援';
