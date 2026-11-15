@@ -122,7 +122,7 @@ internal class RuntimeDownloader(
             part.delete()
             return null
         }
-        val connection = (Uri.parse(url).toURL().openConnection() as java.net.HttpURLConnection).apply {
+        val connection = (java.net.URL(url).openConnection() as java.net.HttpURLConnection).apply {
             connectTimeout = RESUME_CONNECT_TIMEOUT_MS
             readTimeout = RESUME_READ_TIMEOUT_MS
             instanceFollowRedirects = true
