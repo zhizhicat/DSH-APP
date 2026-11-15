@@ -1701,12 +1701,8 @@
           "before": "d5ed602b92410d40b1350185fd48cf1cefb9f606fb0a69351a10e12204afc3a2"
         }
       },
-      "0.2.2-rc.2": {
-        "node_modules/@deepseek-ai/dsh-experimental-agent-team/lib/index.js": {
-          "after": "8a9443665d439b5c1aee020a53896e1365439ed3b17df39e0cd302f3fbf187bf",
-          "before": "d5ed602b92410d40b1350185fd48cf1cefb9f606fb0a69351a10e12204afc3a2"
-        }
-      }
+      "0.2.2-rc.2": false,
+      "0.2.2-rc.3": false
     },
     "zzzzzzzzzz-plugin-manager-log-write-all.diff": {
       "0.2.2-rc.1": {
