@@ -1,0 +1,120 @@
+# Pure engine layer: watch npm upstream @deepseek-ai/dsh and auto-publish an
+# UNPATCHED engine layer ("<version>-pure" key) the day upstream releases.
+# Pure layers carry bridge/boot/direct adapters but none of runtime/patches —
+# the app marks them「纯净」and warns about missing fixes before install.
+# Patched (vetted) layers still come from layers.yml and win on key collision
+# via tooling/merge-layers-index.py (fresh entries win → a later patched run
+# replaces its pure sibling only when the key matches, which merge handles by
+# exact key: "0.2.3" never collides with "0.2.3-pure", both stay selectable).
+name: Pure engine layer
+
+on:
+  schedule:
+    - cron: '17 */3 * * *'   # every 3h; upstream release → layer within hours
+  workflow_dispatch:
+    inputs:
+      dsh_version:
+        description: 'DSH version (empty = npm upstream latest)'
+        default: ''
+
+permissions:
+  contents: write
+
+jobs:
+  detect:
+    runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.check.outputs.version }}
+      skip: ${{ steps.check.outputs.skip }}
+    steps:
+      - name: Check upstream vs published index
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          ver='${{ github.event.inputs.dsh_version }}'
+          if [[ -z "$ver" ]]; then
+            ver="$(npm view @deepseek-ai/dsh version --registry https://registry.npmmirror.com 2>/dev/null \
+              || npm view @deepseek-ai/dsh version)"
+          fi
+          echo "upstream latest: $ver"
+          skip=false
+          if gh release download runtime-layers -p layers-index.json -O published-index.json 2>/dev/null \
+             && [[ -s published-index.json ]]; then
+            if python3 -c "
+import json,sys
+idx=json.load(open('published-index.json'))
+keys=idx['layers'].get('engine',{})
+sys.exit(0 if ('$ver' in keys or '$ver-pure' in keys) else 1)
+"; then
+              echo "already published ($ver or $ver-pure in index) — skip"
+              skip=true
+            fi
+          fi
+          echo "version=$ver" >> "$GITHUB_OUTPUT"
+          echo "skip=$skip" >> "$GITHUB_OUTPUT"
+
+  layers:
+    needs: detect
+    if: needs.detect.outputs.skip != 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Restore build cache
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
+        with:
+          path: runtime/.cache
+          key: runtime-layers-v1-arm64-${{ hashFiles('runtime/build-runtime.sh', 'runtime/build-layers.sh', 'runtime/locks/**', 'runtime/lib/rtbuild.py') }}
+          restore-keys: runtime-layers-v1-arm64-
+
+      - name: Build the pure engine layer
+        env:
+          DSH_VERSION: ${{ needs.detect.outputs.version }}
+        run: |
+          set -euo pipefail
+          RUNTIME_VARIANTS="debian-12:24.22.1" \
+          DSH_VERSION="$DSH_VERSION" \
+          DSH_PURE=1 \
+          RUNTIME_OUT="$PWD/runtime/out" \
+          bash runtime/build-layers.sh
+
+      - name: List the layers
+        run: ls -lh runtime/out/layers-index.json runtime/out/arm64-v8a/assets/runtime/
+
+      - name: Upload build artifact (audit copy)
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: runtime-pure-build
+          path: |
+            runtime/out/layers-index.json
+            runtime/out/arm64-v8a/assets/runtime/
+          if-no-files-found: error
+
+      - name: Merge the fresh layers into the published index
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if gh release download runtime-layers -p layers-index.json -O published-index.json 2>/dev/null && [[ -s published-index.json ]]; then
+            python3 tooling/merge-layers-index.py published-index.json runtime/out/layers-index.json > runtime/out/layers-index.merged.json
+            mv runtime/out/layers-index.merged.json runtime/out/layers-index.json
+          fi
+
+      - name: Publish to the runtime-layers release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          files=(runtime/out/layers-index.json runtime/out/arm64-v8a/assets/runtime/*.tar.xz)
+          if gh release view runtime-layers >/dev/null 2>&1; then
+            gh release upload runtime-layers "${files[@]}" --clobber
+          else
+            gh release create runtime-layers "${files[@]}" \
+              --title "Runtime layers" \
+              --notes "Layer archives for the variant setup page (base / node / DSH). See layers-index.json."
+          fi
+          gh release view runtime-layers --json assets --jq '.assets[].name'

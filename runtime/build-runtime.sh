@@ -537,15 +537,22 @@ PYEOF
   fi
 
   # -- DSH --
+  local dsh_tag="$DSH_VERSION"
+  [[ "${DSH_PURE:-0}" == "1" ]] && dsh_tag="${DSH_VERSION}-pure"
   local prefix="$work/dsh-prefix"
   if [[ ! -f "$work/.dsh-installed" ]]; then
     install_dsh "$npm_cpu" "$prefix" && touch "$work/.dsh-installed"
   else
     log "dsh prefix cached at $prefix"
   fi
-  log "patching DSH (runtime/patches, pinned for $DSH_VERSION)"
-  "${PY[@]}" patch-dsh --prefix "$prefix" --dsh-version "$DSH_VERSION" --patches "$HERE/patches" \
-    --out "$work/dsh-patches.json" >&2
+  if [[ "${DSH_PURE:-0}" == "1" ]]; then
+    log "PURE build: skipping DSH patches (unvetted upstream version allowed)"
+    printf '[]\n' > "$work/dsh-patches.json"
+  else
+    log "patching DSH (runtime/patches, pinned for $DSH_VERSION)"
+    "${PY[@]}" patch-dsh --prefix "$prefix" --dsh-version "$DSH_VERSION" --patches "$HERE/patches" \
+      --out "$work/dsh-patches.json" >&2
+  fi
   local bridge="$HERE/bridge/dsh-go-bridge"
   local bridge_version
   bridge_version="$(python3 -I -c 'import json,sys; print(json.load(open(sys.argv[1]))["version"])' "$bridge/package.json")"
@@ -565,9 +572,13 @@ PYEOF
       sha256 "$base"; sha256 "$node"; sha256 "$python"; sha256sum "${extra_debs[@]}" | cut -d' ' -f1
       sha256 "$proot_deb"; sha256 "$talloc_deb"; sha256 "$shmem_deb"
       sha256 "$lockfile"; sha256 "$pnpm_lockfile"; sha256 "$HERE/build-runtime.sh"; sha256 "$HERE/lib/rtbuild.py"
-      (cd "$HERE" && find patches bridge boot direct session-deletion -type f -print0 | LC_ALL=C sort -z | xargs -0 sha256sum)
+      if [[ "${DSH_PURE:-0}" == "1" ]]; then
+        (cd "$HERE" && find bridge boot direct session-deletion -type f -print0 | LC_ALL=C sort -z | xargs -0 sha256sum)
+      else
+        (cd "$HERE" && find patches bridge boot direct session-deletion -type f -print0 | LC_ALL=C sort -z | xargs -0 sha256sum)
+      fi
     } | sha256sum | cut -c1-12 )"
-  local runtime_version="${RUNTIME_REVISION}-dsh${DSH_VERSION}-node${NODE_VERSION}-base${BASE}-${inputs_sha}"
+  local runtime_version="${RUNTIME_REVISION}-dsh${dsh_tag}-node${NODE_VERSION}-base${BASE}-${inputs_sha}"
   local runtime_info
   runtime_info="$(printf '{"runtimeVersion":"%s","abi":"%s","dshVersion":"%s","nodeVersion":"%s","pnpmVersion":"%s","ubuntuVersion":"%s","prootVersion":"%s","dshPatches":%s,"dshGoBridge":"%s"}' \
     "$runtime_version" "$abi" "$DSH_VERSION" "$NODE_VERSION" "$PNPM_VERSION" "$BASE" "$PROOT_VERSION" \
@@ -583,7 +594,7 @@ PYEOF
     # Variant naming: base carries the distro, node its version, engine the DSH pin.
     archives=("$assets/base-${BASE}-$abi.tar.$COMPRESS" \
               "$assets/node-v${NODE_VERSION}-$abi.tar.$COMPRESS" \
-              "$assets/engine-dsh${DSH_VERSION}-$abi.tar.$COMPRESS")
+              "$assets/engine-dsh${dsh_tag}-$abi.tar.$COMPRESS")
     archive_args=(--base-out "${archives[0]}" --node-out "${archives[1]}" --engine-out "${archives[2]}" --base-cache "$BASE_LAYER_CACHE")
   fi
   local -a prune=(); [[ "$PRUNE_DEV_METADATA" == 1 ]] && prune=(--prune-dev-metadata)
@@ -603,7 +614,7 @@ PYEOF
     # when the layers index is aggregated), and a per-variant manifest for records.
     mkdir -p "$OUT/variants"
     "${PY[@]}" manifest --abi "$abi" --report "$out/build-report.json" --jnilibs "$work/jnilibs.json" \
-      --versions "$versions" --out "$OUT/variants/manifest-${BASE}-${NODE_VERSION}-${DSH_VERSION}-$abi.json" >&2
+      --versions "$versions" --out "$OUT/variants/manifest-${BASE}-${NODE_VERSION}-${dsh_tag}-$abi.json" >&2
     python3 - "$out/build-report.json" "$OUT/layers-$abi.jsonl" <<'PYV'
 import json, sys
 report = json.load(open(sys.argv[1]))
