@@ -18,8 +18,16 @@ assert pub_abis == fresh_abis, "abi mismatch"
 # The published abis block carries richer per-abi metadata; keep it verbatim.
 
 merged_layers = dict(published.get("layers", {}))
-for name, layer in fresh.get("layers", {}).items():
-    merged_layers[name] = layer
+for group, entries in fresh.get("layers", {}).items():
+    # Deep merge per group (base/node/engine): fresh version keys win on
+    # collision, published-only version keys (other distros/DSH versions)
+    # survive. A plain top-level assignment would erase them.
+    merged_layers.setdefault(group, {})
+    if isinstance(entries, dict) and isinstance(merged_layers[group], dict):
+        for key, layer in entries.items():
+            merged_layers[group][key] = layer
+    else:
+        merged_layers[group] = entries
 
 published["layers"] = merged_layers
 published["notes"] = fresh.get("notes", published.get("notes"))
