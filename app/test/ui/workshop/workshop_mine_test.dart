@@ -385,7 +385,7 @@ void main() {
 
       await tester.tap(find.byTooltip(zh.workshopMineRefreshOne));
       await settle(tester);
-      expect(find.text('${zh.workshopMineDetailStale} ${zh.workshopErrorForumDown}'), findsOneWidget);
+      expect(find.text('${zh.workshopMineDetailStale} ${zh.workshopErrorAccountDown}'), findsOneWidget);
       expect(find.text(zh.workshopMineAboutPending), findsOneWidget);
       expectNoCodes(tester);
     });

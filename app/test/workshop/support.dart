@@ -38,9 +38,11 @@ Map<String, Object?> workshopCatalogJson({List<Object?>? entries, List<Object?> 
   'entries': entries ?? [workshopEntryJson()], 'withdrawn': withdrawn,
 };
 
+final workshopTestForum = Uri.parse('https://forum.example');
+
 Map<String, Object?> workshopCaps({bool uploads = true, bool companion = true, String? account,
-  String? clientId = 'test-client-id'}) => {
-  'schema': 1, 'features': {'uploads': uploads, 'companion': companion}, 'kinds': ['pet', 'companion'],
+  String? clientId = 'test-client-id', String? forum}) => {
+  'schema': 1, 'forumOrigin': forum ?? workshopTestForum.toString(), 'features': {'uploads': uploads, 'companion': companion}, 'kinds': ['pet', 'companion'],
   'licenses': workshopLicenses.toList(), 'account': {'origin': account ?? workshopTestAccount.toString(), 'clientId': clientId},
   'maxMocVersion': 6,
   'limits': {'archiveBytes': workshopArchiveBytes, 'expandedBytes': workshopExpandedBytes, 'companionMemberBytes': 16 * 1024 * 1024, 'companionEntries': 1000, 'petEntries': 256},
