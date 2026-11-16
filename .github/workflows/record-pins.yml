@@ -34,19 +34,24 @@ jobs:
           mkdir "$prefix"
           cp "runtime/locks/dsh-$version/package.json" "runtime/locks/dsh-$version/package-lock.json" "$prefix/"
           npm ci --prefix "$prefix" --ignore-scripts --no-audit --no-fund
-          python3 -I runtime/lib/rtbuild.py patch-dsh --prefix "$prefix" --dsh-version "$version" --target android --record
+          python3 -I runtime/lib/rtbuild.py patch-dsh --prefix "$prefix" --dsh-version "$version" --target android --record || record_failed=1
+          mkdir -p "$RUNNER_TEMP/drift-files"
+          for f in dsh-client-ui-input-trigger/lib/client.js dsh-client-ui-agent-preset/lib/client.js dsh-client-ui-settings-web-search/lib/client.js dsh-host-webserver/lib/index.js rrule/dist/es5/rrule.js dsh-fs-local/lib/index.js; do
+            src="$prefix/node_modules/@deepseek-ai/$f"
+            [ -f "$src" ] && cp "$src" "$RUNNER_TEMP/drift-files/" || true
+          done
       - name: Upload recorded pins
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: recorded-pins
           path: runtime/patches/pins.json
-      - name: Pack the DSH prefix
-        if: failure()
-        run: cd "$RUNNER_TEMP" && tar czf prefix.tar.gz dsh
-      - name: Upload prefix
-        if: failure()
+      - name: Pack drift files
+        if: always()
+        run: cd "$RUNNER_TEMP" && tar czf drift.tar.gz drift-files
+      - name: Upload drift files
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: dsh-prefix
-          path: ${{ runner.temp }}/prefix.tar.gz
+          name: drift-files
+          path: ${{ runner.temp }}/drift.tar.gz
