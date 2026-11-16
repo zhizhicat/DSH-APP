@@ -1,4 +1,7 @@
 # One patch per line, in application order. Keep every .diff exactly once.
+cordis-effect-dispose-completion.diff
+credentials-decimal-refs.diff
+fs-create-exclusive.diff
 install-log-redaction.diff
 install-log-redaction-expected.diff
 piai-anthropic-opus55-thinking.diff
@@ -9,6 +12,7 @@ plugin-manager-cancel-tree-expected.diff
 preset-legacy-delegation.diff
 route-guard.diff
 route-guard-expected.diff
+client-hmr-closed-response.diff
 schemastery-json-context.diff
 session-title-word-prefix.diff
 str-editor-view-prefix.diff
@@ -107,6 +111,7 @@ zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz-workspace-capture-recovery.diff
 zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz-fs-parent-kind.diff
 zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz-fs-line-style.diff
 fs-create-link-denial.diff
+fs-publication-short-names.diff
 zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz-fs-patch-equal-width.diff
 zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz-instruction-encoding-reuse.diff
 zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz-str-editor-bom.diff
@@ -136,7 +141,6 @@ terminal-job-cancel.diff
 provider-discovery-headers.diff
 session-format-error.diff
 session-queue-steer-deletion.diff
-
 webserver-resource-abort.diff
 rrule-negative-position-range.diff
 rrule-weekly-first-period.diff
