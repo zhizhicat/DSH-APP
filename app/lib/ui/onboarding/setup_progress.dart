@@ -86,7 +86,10 @@ class RuntimeInstallController extends Notifier<bool> {
   /// kept-files failure means archives already sit on disk.
   void installFromStatus({bool dropKept = false}) {
     final status = ref.read(localRuntimeProvider).status;
-    if (dropKept || status.bundledVersion != null) {
+    // A kept-files failure means archives already sit on disk: retrying the
+    // restore (and abandoning the files) both go through the bundled install,
+    // never the channel downloader.
+    if (dropKept || status.bundledVersion != null || status.keepFailed) {
       unawaited(install(dropKept: dropKept));
       return;
     }
