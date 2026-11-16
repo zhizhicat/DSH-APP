@@ -28,12 +28,11 @@ import org.json.JSONObject
  * First install creates the system; upgrades replace only app-owned engine paths.
  * The user's Linux system, package databases and home are never rebuilt implicitly.
  */
-internal class RuntimeInstaller(
+class RuntimeInstaller(
     private val context: Context,
     private val manifest: RuntimeManifest,
     private val onLog: (String) -> Unit,
     private val sync: () -> Unit = ::syncFilesystems,
-    private val source: ArchiveSource = AssetArchiveSource(context),
 ) {
     val baseDir = File(context.filesDir, "runtime")
     val rootfs = File(baseDir, "rootfs")
@@ -59,7 +58,7 @@ internal class RuntimeInstaller(
      */
     fun install(dropKept: Boolean = false, onProgress: (Long, Long) -> Unit) {
         // A reset killed halfway finishes first, so what it keeps is in runtime-keep for the restore.
-        settleReset(retiredDir, keepDir, dropKept)
+        settleReset(baseDir, retiredDir, keepDir, dropKept, sync)
         baseDir.mkdirs()
         // The transaction owns its payload outside staging. Finish it before any
         // cleanup, including when a different APK resumes this install.
@@ -71,7 +70,7 @@ internal class RuntimeInstaller(
         checkFreeSpace(archives)
         staging.mkdirs()
 
-        val assetLengths = archives.map { source.length("${RuntimeManifest.ASSET_DIR}/${it.asset}") }
+        val assetLengths = archives.map { assetLength("${RuntimeManifest.ASSET_DIR}/${it.asset}") }
         val totals = archives.mapIndexed { i, archive -> assetLengths[i].takeIf { it > 0 } ?: archive.bytes }
         val total = totals.sum()
         onLog("[dsh-app] install assets: ${archives.joinToString { it.asset }} ($total compressed bytes)")
@@ -89,7 +88,7 @@ internal class RuntimeInstaller(
             timed("verify") {
                 // Parallel readers revisit compressed bytes; hash each selected asset once, in order.
                 val digest = MessageDigest.getInstance("SHA-256")
-                DigestInputStream(source.open(assetPath), digest).use { input ->
+                DigestInputStream(context.assets.open(assetPath, AssetManager.ACCESS_STREAMING), digest).use { input ->
                     val buffer = ByteArray(1 shl 16)
                     while (input.read(buffer) >= 0) {}
                 }
@@ -104,11 +103,11 @@ internal class RuntimeInstaller(
                 val extractor = TarExtractor(staging, progress)
                 if (archive.asset.endsWith(".xz") && assetLengths[index] > 0) {
                     val decoded = ParallelXZInputStream.open(
-                        { source.openSeekable(assetPath) }, progress,
+                        { AssetSeekableInputStream(context.assets.openFd(assetPath)) }, progress,
                     )
                     extractor.extractDecoded(decoded)
                 } else {
-                    source.open(assetPath).use { raw ->
+                    context.assets.open(assetPath, AssetManager.ACCESS_STREAMING).use { raw ->
                         extractor.extract(raw, archive.asset)
                     }
                 }
@@ -157,9 +156,14 @@ internal class RuntimeInstaller(
             // The store goes with the runtime: a kept name we could not convert would be lost.
             check(!(result as TawcrootLinks.Result.Done).unseen) { "keep: some files from the tawcroot launch could not be read; nothing was reset" }
         }
-        retireRuntime(baseDir, retiredDir, keepDir, keep)
+        retireRuntime(baseDir, retiredDir, keepDir, keep, sync)
     }
 
+    private fun assetLength(path: String): Long = try {
+        context.assets.openFd(path).use { it.length }
+    } catch (_: Exception) {
+        -1L // compressed asset; fall back to the manifest
+    }
 }
 
 internal fun requiredRuntimeInstallSpace(archives: List<RuntimeArchive>): Long {
@@ -334,8 +338,8 @@ class KeepFailed(rel: String) : IllegalStateException("keep: could not move $rel
  * killed at any point is finished by the next one or by the next install ([settleReset]). Nothing is
  * deleted before what is kept has moved.
  */
-internal fun retireRuntime(base: File, retired: File, keep: File, paths: List<String>) {
-    settleReset(retired, keep)
+internal fun retireRuntime(base: File, retired: File, keep: File, paths: List<String>, sync: () -> Unit = ::syncFilesystems) {
+    settleReset(base, retired, keep, sync = sync)
     if (!base.exists()) {
         // Nothing to take from; the choice still applies to what an earlier reset kept.
         pruneKept(keep, paths)
@@ -347,7 +351,7 @@ internal fun retireRuntime(base: File, retired: File, keep: File, paths: List<St
         list.delete()
         throw IllegalStateException("could not retire the runtime")
     }
-    settleReset(retired, keep)
+    settleReset(base, retired, keep, sync = sync)
 }
 
 /**
@@ -357,7 +361,7 @@ internal fun retireRuntime(base: File, retired: File, keep: File, paths: List<St
  * runtime stays as it is and the next attempt picks up from there; with [dropFailed] it is deleted
  * with whatever could not move.
  */
-internal fun settleReset(retired: File, keep: File, dropFailed: Boolean = false) {
+internal fun settleReset(base: File, retired: File, keep: File, dropFailed: Boolean = false, sync: () -> Unit = ::syncFilesystems) {
     if (!retired.present()) return
     val list = File(retired, KEEP_LIST)
     val listed = readKeepList(list)
@@ -369,6 +373,14 @@ internal fun settleReset(retired: File, keep: File, dropFailed: Boolean = false)
         val from = File(home, rel.removePrefix("root/"))
         val to = File(keep, rel)
         if (!from.present() || to.present()) continue
+        // PRoot names still address the original rootfs even after retirement or
+        // home.carry. Materialize this item before deleting its shared .l2s store.
+        try {
+            L2sMigration(File(base, "rootfs"), sync, within = from, relocatedStore = File(home, ".l2s")).run()
+        } catch (_: Exception) {
+            if (!dropFailed) throw KeepFailed(rel)
+            // Still move this item: a failed conversion must not discard its ordinary files.
+        }
         to.parentFile?.mkdirs()
         if (!from.renameTo(to) && !dropFailed) throw KeepFailed(rel)
     }

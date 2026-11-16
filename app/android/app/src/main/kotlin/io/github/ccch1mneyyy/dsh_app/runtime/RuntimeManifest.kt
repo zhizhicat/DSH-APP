@@ -1,7 +1,6 @@
 package io.github.ccch1mneyyy.dsh_app.runtime
 
 import android.content.Context
-import java.io.File
 import org.json.JSONObject
 
 data class RuntimeArchive(
@@ -33,36 +32,9 @@ data class RuntimeManifest(
     companion object {
         const val ASSET_DIR = "runtime"
 
-        /** The downloaded channel's manifest, so a noruntime build can identify its
-         *  installed runtime after the app process is killed (else every cold start
-         *  looks like a fresh first run and re-downloads everything). */
-        private val CHANNEL_FILE = File(File(ASSET_DIR), "channel-manifest.json")
-
         fun load(context: Context): RuntimeManifest {
             val text = context.assets.open("$ASSET_DIR/manifest.json").bufferedReader().use { it.readText() }
             return fromJson(JSONObject(text))
-        }
-
-        /** Persists a downloaded channel manifest (atomic-ish: temp then rename). */
-        fun saveChannel(context: Context, manifest: RuntimeManifest) {
-            runCatching {
-                val dir = File(context.filesDir, ASSET_DIR)
-                dir.mkdirs()
-                val temp = File(dir, CHANNEL_FILE.name + ".tmp")
-                temp.writeText(manifest.raw.toString())
-                if (!temp.renameTo(CHANNEL_FILE)) {
-                    CHANNEL_FILE.writeText(manifest.raw.toString())
-                    temp.delete()
-                }
-            }
-        }
-
-        fun loadChannel(context: Context): RuntimeManifest? = runCatching {
-            fromJson(JSONObject(File(File(context.filesDir, ASSET_DIR), CHANNEL_FILE.name).readText()))
-        }.getOrNull()
-
-        fun clearChannel(context: Context) {
-            runCatching { File(File(context.filesDir, ASSET_DIR), CHANNEL_FILE.name).delete() }
         }
 
         internal fun fromJson(json: JSONObject): RuntimeManifest {
@@ -77,12 +49,7 @@ data class RuntimeManifest(
                     val abi = json.getString("abi")
                     require(abi in listOf("arm64-v8a", "x86_64"))
                     val layers = json.getJSONObject("layers")
-                    // Variant channels carry a middle node layer: base, node, engine
-                    // unpack in order (later layers win). Asset names include the
-                    // version, e.g. base-ubuntu-24.04.5-<abi>.tar.xz.
-                    val names = if (layers.has("node")) listOf("base", "node", "engine")
-                                else listOf("base", "engine")
-                    names.map { name ->
+                    listOf("base", "engine").map { name ->
                         val layer = layers.getJSONObject(name)
                         val digest = layer.getString("sha256")
                         val tarDigest = layer.getString("tarSha256")
@@ -90,8 +57,7 @@ data class RuntimeManifest(
                             digest, layer.getLong("uncompressedBytes")).also {
                             require(it.bytes > 0 && it.uncompressedBytes >= 0 &&
                                 layer.getLong("tarBytes") >= 0 &&
-                                it.asset.startsWith("$name-") &&
-                                (it.asset.endsWith("-$abi.tar.xz") || it.asset.endsWith("-$abi.tar.gz")) &&
+                                it.asset in listOf("$name-$abi.tar.xz", "$name-$abi.tar.gz") &&
                                 listOf(digest, tarDigest).all { hash -> hash.matches(Regex("[0-9a-f]{64}")) })
                         }
                     }

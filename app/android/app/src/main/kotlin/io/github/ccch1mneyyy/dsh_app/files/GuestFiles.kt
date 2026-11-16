@@ -15,7 +15,8 @@ import java.nio.file.LinkOption
  * `/sdcard` and `/storage` (PhoneStorage.binds). Symlinks usually hold guest
  * targets (`/usr/lib/…`), but `--link2symlink` uses host-absolute targets in
  * the rootfs's `/root/.l2s`. Rebase those targets before following each link
- * in the guest world, not by Android.
+ * in the guest world, not by Android. tawc's opaque hard-link names instead
+ * refer to objects in the rootfs's sibling store.
  */
 object GuestFiles {
     private const val MAX_LINKS = 16

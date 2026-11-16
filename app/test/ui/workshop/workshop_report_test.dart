@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:dsh_app/forum/forum_auth.dart';
 import 'package:dsh_app/state/workshop_report_state.dart';
 import 'package:dsh_app/ui/workshop/workshop_report_sheet.dart';
 import 'package:dsh_app/workshop/workshop_models.dart';
@@ -11,8 +10,6 @@ import 'package:flutter_test/flutter_test.dart';
 import '../../chat/support/harness.dart' show usePhoneView;
 import '../../workshop/support.dart' show workshopEntryJson, workshopMeta;
 import 'workshop_mine_support.dart';
-
-const authSignedOut = ForumAuthState(phase: ForumAuthPhase.signedOut);
 
 const _lost = WorkshopException('workshop_timeout', resultUnknown: true);
 
