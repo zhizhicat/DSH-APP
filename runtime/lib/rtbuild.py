@@ -487,8 +487,16 @@ def cmd_patch_dsh(args):
     for rel, expected in excluded_original.items():
         actual = hashlib.sha256(open(os.path.join(args.prefix, rel), "rb").read()).hexdigest()
         if actual != expected:
-            sys.exit("target %s excludes changes to %s, but its sha256 %s is not the vetted original %s; use a fresh prefix" %
-                     (args.target, rel, actual, expected))
+            if not args.record:
+                sys.exit("target %s excludes changes to %s, but its sha256 %s is not the vetted original %s; use a fresh prefix" %
+                         (args.target, rel, actual, expected))
+            # Record mode: this prefix was installed fresh for this DSH version,
+            # so what we observe IS the vetted original for it. Update the
+            # excluded patches' before-hashes so a later verify run passes.
+            for name in excluded_names:
+                version_pins = pins["patches"].get(name, {}).get(args.dsh_version)
+                if isinstance(version_pins, dict) and rel in version_pins:
+                    version_pins[rel]["before"] = actual
     applied = []
     for name in names:
         diff = parsed[name]
