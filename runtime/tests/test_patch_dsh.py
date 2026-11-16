@@ -128,12 +128,18 @@ class PatchDsh(unittest.TestCase):
         args = SimpleNamespace(prefix=self.prefix, patches=self.patches,
                                dsh_version="2.0.0", target="android", record=True, out=None)
 
-        def interrupted_dump(value, output, **options):
-            # Fault injection after a real partial write; this does not fill the disk.
-            output.write(json.dumps(value, **options)[:100])
-            raise OSError(errno.ENOSPC, "injected pin recording write failure")
+        # fork: record saves pins incrementally after each applied patch. Let the
+        # first save write for real, then inject the fault on the second one: the
+        # first patch's pins survive and the full chain has been applied.
+        def first_real_then_interrupted(value, output, **options):
+            if first_real_then_interrupted.calls:
+                output.write(json.dumps(value, **options)[:100])
+                raise OSError(errno.ENOSPC, "injected pin recording write failure")
+            output.write(json.dumps(value, **options))
+            first_real_then_interrupted.calls += 1
+        first_real_then_interrupted.calls = 0
 
-        with mock.patch.object(rtbuild.json, "dump", side_effect=interrupted_dump):
+        with mock.patch.object(rtbuild.json, "dump", side_effect=first_real_then_interrupted):
             with self.assertRaises(OSError) as failure:
                 rtbuild.cmd_patch_dsh(args)
         self.assertEqual(failure.exception.errno, errno.ENOSPC)
@@ -151,7 +157,9 @@ class PatchDsh(unittest.TestCase):
         retry_target = fresh_prefix("fresh-record")
         retry = self.run_cli("--dsh-version", "2.0.0", "--record")
         self.assertEqual(retry.returncode, 0, retry.stdout)
-        self.assertEqual(after_failure, previous)
+        self.assertNotEqual(after_failure, previous)  # the first patch's pins survived
+        self.assertEqual(load(pins_path)["patches"][list(previous_pins["patches"])[0]]["2.0.0"],
+                         previous_pins["patches"][list(previous_pins["patches"])[0]]["1.0.0"])
         self.assertEqual(read(retry_target), final)
         recorded = load(pins_path)
         for name, versions in previous_pins["patches"].items():
@@ -357,6 +365,8 @@ class PatchDsh(unittest.TestCase):
             files = rtbuild.parse_unified_diff(read(os.path.join(shipped, name)))
             self.assertTrue(files and all(hunks for _, hunks in files), name)
             for version, by_file in pins["patches"][name].items():
+                if by_file is False:
+                    continue  # fork: whole patch marked N/A for this DSH version
                 self.assertEqual(sorted(by_file), sorted(rel for rel, _ in files), (name, version))
 
     @unittest.skipUnless(os.environ.get("DSH_FS_LOCAL_ORIGINAL_JS"),

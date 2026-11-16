@@ -511,7 +511,9 @@ def cmd_patch_dsh(args):
             if not args.record:
                 if pin is None:
                     sys.exit("%s: no pin for %s" % (name, rel))
-                if before in later[name].get(rel, ()) or after_positions.get(rel, {}).get(before, -1) >= 0:
+                if before in later[name].get(rel, ()):
+                    # Upstream semantics: a file whose current hash is a later
+                    # patch's pinned "before" is already past this patch.
                     print("%s: %s already patched" % (name, rel))
                     observed[rel] = pin
                     continue
@@ -535,9 +537,10 @@ def cmd_patch_dsh(args):
             # Incremental save: a later patch failure must not lose the pins
             # already recorded this run (re-runs would re-apply patched files
             # with no pin to recognize them, and sweep would mis-N/A them).
-            with open(pins_path, "w") as f:
+            with open(pins_path + ".tmp", "w") as f:
                 json.dump(pins, f, indent=2, sort_keys=True)
                 f.write("\n")
+            os.replace(pins_path + ".tmp", pins_path)
         applied.append(name)
     if args.record:
         with open(pins_path + ".tmp", "w") as f:

@@ -74,9 +74,9 @@ PRUNE_DEV_METADATA="${PRUNE_DEV_METADATA:-1}"   # drop *.map / *.d.ts from node_
 SOURCE_DATE_EPOCH="${SOURCE_DATE_EPOCH:-1767225600}"  # 2026-01-01T00:00:00Z, fixed tar mtimes
 
 # -- 分层镜像组（空格分隔，逐个降级；env 覆盖可换序/换源。首源=GitHub runner 最快的官方，国内源作降级与本地构建首选）
-UBUNTU_CDIMAGE_MIRRORS="${UBUNTU_CDIMAGE_MIRRORS:-https://cdimage.ubuntu.com/ubuntu-base/releases https://mirrors.tuna.tsinghua.edu.cn/ubuntu-cdimage/ubuntu-base/releases https://mirrors.aliyun.com/ubuntu-cdimage/ubuntu-base/releases https://mirrors.huaweicloud.com/ubuntu-cdimage/ubuntu-base/releases}"
-UBUNTU_MIRROR="${UBUNTU_MIRROR:-https://mirrors.tuna.tsinghua.edu.cn/ubuntu-cdimage/ubuntu-base/releases/${BASE_VER%.*}/release}"  # legacy 单镜像覆盖（CI 兼容）
-NODE_MIRRORS="${NODE_MIRRORS:-https://nodejs.org/dist https://mirrors.tuna.tsinghua.edu.cn/nodejs-release https://mirrors.aliyun.com/nodejs-release https://mirrors.huaweicloud.com/nodejs https://npmmirror.com/mirrors/node}"
+UBUNTU_CDIMAGE_MIRRORS="${UBUNTU_CDIMAGE_MIRRORS:-https://mirrors.tuna.tsinghua.edu.cn/ubuntu-cdimage/ubuntu-base/releases https://cdimage.ubuntu.com/ubuntu-base/releases}"   # 主+回落;国内构建可环境变量加池
+UBUNTU_MIRROR="${UBUNTU_MIRROR:-https://mirrors.tuna.tsinghua.edu.cn/ubuntu-cdimage/ubuntu-base/releases/24.04/release}"  # 单镜像完整路径;非 24.04 构建由 build-layers/env 显式传入
+NODE_MIRRORS="${NODE_MIRRORS:-https://npmmirror.com/mirrors/node https://nodejs.org/dist}"   # 主+回落;国内构建可环境变量加池
 NODE_MIRROR="${NODE_MIRROR:-https://npmmirror.com/mirrors/node}"
 NPM_REGISTRIES="${NPM_REGISTRIES:-https://registry.npmmirror.com https://mirrors.huaweicloud.com/repository/npm https://mirrors.cloud.tencent.com/npm https://registry.npmjs.org}"
 NPM_REGISTRY="${NPM_REGISTRY:-https://registry.npmmirror.com}"
@@ -193,14 +193,16 @@ ubuntu_base() {  # $1 = ubuntu arch; echoes path
   local arch="$1" name="ubuntu-base-${UBUNTU_VERSION}-base-$1.tar.gz"
   local dir="$CACHE/ubuntu/$UBUNTU_VERSION"
   local pin; pin="$(pin_of "$name")"
-  local -a uurls=()
-  for m in $UBUNTU_CDIMAGE_MIRRORS; do uurls+=("$m/${UBUNTU_VERSION%.*}/release"); done
+  # Upstream semantics: one mirror URL (complete path, version included) in
+  # UBUNTU_MIRROR; the CDIMAGE pool stays available for environment overrides.
+  local -a uurls=("$UBUNTU_MIRROR")
+  [[ -z "$UBUNTU_MIRROR" ]] && for m in $UBUNTU_CDIMAGE_MIRRORS; do uurls+=("$m/${UBUNTU_VERSION%.*}/release"); done
   if [[ -z "$pin" ]]; then
-    fetch "${uurls[0]}/SHA256SUMS" "$dir/SHA256SUMS" "${uurls[@]:1}"
+    fetch "${uurls[0]}/SHA256SUMS" "$dir/SHA256SUMS"
     pin="$(awk -v f="$name" '{n=$2; sub(/^\*/,"",n); if (n==f) print $1}' "$dir/SHA256SUMS")"
     [[ -n "$pin" ]] || { rm -f "$dir/SHA256SUMS"; die "$name not listed in SHA256SUMS (stale cache removed, rerun)"; }
   fi
-  fetch "${uurls[0]}/$name" "$dir/$name" "$pin" "${uurls[@]:1}"
+  fetch "${uurls[0]}/$name" "$dir/$name" "$pin"
   printf '%s' "$dir/$name"
 }
 
@@ -210,11 +212,11 @@ node_dist() {  # $1 = node arch (arm64|x64); echoes path
   local -a nurls=()
   for m in $NODE_MIRRORS; do nurls+=("$m/v$NODE_VERSION"); done
   if [[ -z "$pin" ]]; then
-    fetch "${nurls[0]}/SHASUMS256.txt" "$dir/SHASUMS256.txt" "${nurls[@]:1}"
+    fetch "${nurls[0]}/SHASUMS256.txt" "$dir/SHASUMS256.txt"
     pin="$(awk -v f="$name" '$2==f {print $1}' "$dir/SHASUMS256.txt")"
     [[ -n "$pin" ]] || die "$name not listed in SHASUMS256.txt"
   fi
-  fetch "${nurls[0]}/$name" "$dir/$name" "$pin" "${nurls[@]:1}"
+  fetch "${nurls[0]}/$name" "$dir/$name" "$pin"
   printf '%s' "$dir/$name"
 }
 
@@ -244,8 +246,10 @@ termux_deb() {  # $1 = package, $2 = version, $3 = termux arch; echoes path
 # gpgv against the archive keyring extracted from the checksum-verified base rootfs -> Packages.xz
 # hash -> each .deb hash. The resolved set is pinned in runtime/locks/<base>-<arch>.json
 # (re-resolve with UPDATE_DEB_LOCK=1).
-extra_debs() {  # $1 = distro arch, $2 = verified base tarball; echoes deb paths, one per line
-  local arch="$1" base="$2" lock="$LOCKS/$BASE-$1.json" mirror keyring_name
+ubuntu_extra_debs() {  # $1 = distro arch, $2 = verified base tarball; echoes deb paths, one per line
+  # Lock naming follows the upstream convention: <distro>-<codename>-<arch>.json
+  # (ubuntu-noble-arm64.json, debian-bookworm-arm64.json, ...).
+  local arch="$1" base="$2" lock="$LOCKS/$DISTRO-$APT_CODENAME-$1.json" mirror keyring_name
   case "$DISTRO" in
     ubuntu)
       [[ "$arch" == amd64 ]] && mirror="$UBUNTU_ARCHIVE_AMD64" || mirror="$UBUNTU_ARCHIVE_ARM64"
@@ -536,7 +540,7 @@ build_abi() {
   local base node proot_deb talloc_deb shmem_deb proot_src
   base="$(rootfs_base "$ubuntu_arch")"
   node="$(node_dist "$node_arch")"
-  extra_debs "$ubuntu_arch" "$base" > "$work/extra-debs.txt"   # set -e aborts on any failure inside
+  ubuntu_extra_debs "$ubuntu_arch" "$base" > "$work/extra-debs.txt"   # set -e aborts on any failure inside
   local -a extra_debs=(); mapfile -t extra_debs < "$work/extra-debs.txt"
   [[ ${#extra_debs[@]} -gt 0 ]] || die "base-distro package resolution produced nothing"
   local python; python="$(python_dist "$termux_arch")"
