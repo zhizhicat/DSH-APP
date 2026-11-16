@@ -35,10 +35,9 @@ jobs:
           cp "runtime/locks/dsh-$version/package.json" "runtime/locks/dsh-$version/package-lock.json" "$prefix/"
           npm ci --prefix "$prefix" --ignore-scripts --no-audit --no-fund
           python3 -I runtime/lib/rtbuild.py patch-dsh --prefix "$prefix" --dsh-version "$version" --target android --record || record_failed=1
-          # Ship every drift-candidate target back with unique names.
           mkdir -p "$RUNNER_TEMP/drift-files"
           i=0
-          while IFS= read -r f; do
+          for f in dsh-client-ui-input-trigger/lib/client.js dsh-client-ui-agent-preset/lib/client.js dsh-client-ui-settings-web-search/lib/client.js dsh-host-webserver/lib/index.js rrule/dist/es5/rrule.js dsh-fs-local/lib/index.js; do
             src="$prefix/node_modules/@deepseek-ai/$f"
             i=$((i+1))
             if [ -f "$src" ]; then
@@ -50,14 +49,7 @@ jobs:
               pkg=$(basename "$(dirname "$(dirname "$f")")")
               cp "$src" "$RUNNER_TEMP/drift-files/${pkg}__${kind}.js"
             fi
-          done << 'LIST'
-dsh-client-ui-input-trigger/lib/client.js
-dsh-client-ui-agent-preset/lib/client.js
-dsh-client-ui-settings-web-search/lib/client.js
-dsh-host-webserver/lib/index.js
-rrule/dist/es5/rrule.js
-dsh-fs-local/lib/index.js
-LIST
+          done
       - name: Upload recorded pins
         if: always()
         uses: actions/upload-artifact@v4
