@@ -1,0 +1,42 @@
+name: Record pins
+
+# Manual helper: installs the pinned DSH lock, runs patch-dsh --record, and
+# uploads the recorded pins.json as an artifact. Used when the shipped pins
+# fall behind the pinned DSH version (a CI "no pin / broken chain" failure)
+# and local npm access is unavailable.
+on:
+  workflow_dispatch:
+    inputs:
+      dsh_version:
+        description: 'DSH version to record (empty = newest pinned lock)'
+        required: false
+        default: ''
+
+jobs:
+  record:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Record pins for the pinned DSH lock
+        run: |
+          version="${{ inputs.dsh_version }}"
+          if [ -z "$version" ]; then
+            version=$(sed -nE 's/^DSH_VERSION="\$\{DSH_VERSION:-(.+)\}"$/\1/p' runtime/build-runtime.sh)
+          fi
+          if [ -z "$version" ] || [ ! -f "runtime/locks/dsh-$version/package-lock.json" ]; then
+            version=$(ls runtime/locks | sed -nE 's/^dsh-(.+)$/\1/p' | sort -V | tail -1)
+          fi
+          echo "Recording pins for DSH $version"
+          prefix="$RUNNER_TEMP/dsh"
+          mkdir "$prefix"
+          cp "runtime/locks/dsh-$version/package.json" "runtime/locks/dsh-$version/package-lock.json" "$prefix/"
+          npm ci --prefix "$prefix" --ignore-scripts --no-audit --no-fund
+          python3 -I runtime/lib/rtbuild.py patch-dsh --prefix "$prefix" --dsh-version "$version" --target android --record
+      - name: Upload recorded pins
+        uses: actions/upload-artifact@v4
+        with:
+          name: recorded-pins
+          path: runtime/patches/pins.json
