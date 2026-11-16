@@ -3481,8 +3481,8 @@
    },
    "0.2.2-rc.3": {
     "node_modules/@deepseek-ai/dsh-llm-deepseek/lib/index.js": {
-     "after": "33932219045bc1f31f96c94ce2a18883ad108ecdf0f7f74d7911e8a7d6257917",
-     "before": "2e265c0bb1b759035682f65a8243ac8c9a33d7c6e793530fa290b48b0c55605f"
+     "after": "52685e280927536ef92cc92cef79d5a0738e006a97408e27a9637fe8338a7673",
+     "before": "e00c1816c29803ddd02b61e165e0376a62805b0af9873e3bac6daebf958cc137"
     }
    }
   },
@@ -3495,8 +3495,8 @@
    },
    "0.2.2-rc.3": {
     "node_modules/@deepseek-ai/dsh-api-session-controller/lib/index.js": {
-     "after": "5e14c333b6e401448f17205b5afc4abfcd52b8ed706ff9253a43215a061c73cd",
-     "before": "3b24a3b02a80a859bc3cae31e081cee2a2e16d152d19f70bfd9fe4d981e0a790"
+     "after": "352a895db4b257cdb6f39b27246be005c12bdc9ba0b2d21214de319e59520f2d",
+     "before": "ca0d6625997d292a99782e0a40555bf3b4bd70ca6c22011823db988f3bae9504"
     }
    }
   },
@@ -3523,8 +3523,8 @@
    },
    "0.2.2-rc.3": {
     "node_modules/@deepseek-ai/dsh-client-ui-input-trigger/lib/client.js": {
-     "before": "8e70bf8380ac3940c6c78adea164d54b921f24ae8237be5f761a2a6ce461b296",
-     "after": "16f602128756763a61f677b2d0cf29907af85a472567cea8d3d9db4cc0d052a1"
+     "after": "16f602128756763a61f677b2d0cf29907af85a472567cea8d3d9db4cc0d052a1",
+     "before": "8e70bf8380ac3940c6c78adea164d54b921f24ae8237be5f761a2a6ce461b296"
     }
    }
   },
@@ -3593,8 +3593,8 @@
    },
    "0.2.2-rc.3": {
     "node_modules/@deepseek-ai/dsh-client-ui-agent-preset/lib/client.js": {
-     "before": "29af5e7ebb096e0befaedf77bd42523063c5cca5a328bf450f6c095dd2a6d3a3",
-     "after": "b66d3a5b9352ad58784c31a9d3c32c572e71fe4944d1228f4f4af9d004d0a158"
+     "after": "b66d3a5b9352ad58784c31a9d3c32c572e71fe4944d1228f4f4af9d004d0a158",
+     "before": "29af5e7ebb096e0befaedf77bd42523063c5cca5a328bf450f6c095dd2a6d3a3"
     }
    }
   },
@@ -3607,8 +3607,8 @@
    },
    "0.2.2-rc.3": {
     "node_modules/@deepseek-ai/dsh-client-ui-settings-web-search/lib/client.js": {
-     "before": "83cd224e4527e952507259fb52ebab1f737c245ff4ce397a3b25b191ccb9aa7b",
-     "after": "1b61d53dcf49c6fd1c2ed0a27f6847658b5eb45bcfb4da0e2212ce0446cf36ea"
+     "after": "1b61d53dcf49c6fd1c2ed0a27f6847658b5eb45bcfb4da0e2212ce0446cf36ea",
+     "before": "83cd224e4527e952507259fb52ebab1f737c245ff4ce397a3b25b191ccb9aa7b"
     }
    }
   },
