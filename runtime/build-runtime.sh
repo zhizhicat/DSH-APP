@@ -649,7 +649,7 @@ PYEOF
     printf '[]\n' > "$work/dsh-patches.json"
   else
     log "patching DSH (runtime/patches, pinned for $DSH_VERSION)"
-    "${PY[@]}" patch-dsh --prefix "$prefix" --dsh-version "$DSH_VERSION" --patches "$HERE/patches" \
+    "${PY[@]}" patch-dsh --target android --prefix "$prefix" --dsh-version "$DSH_VERSION" --patches "$HERE/patches" \
       --out "$work/dsh-patches.json" >&2
   fi
   local bridge="$HERE/bridge/dsh-go-bridge"
