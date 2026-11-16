@@ -41,9 +41,9 @@ PNPM_BINS = {"pnpm": "pnpm.mjs", "pnpx": "pnpx.mjs", "pn": "pnpm.mjs", "pnx": "p
 # (base x node x engine) combinations need only base + node + engine packages.
 NODE_PATHS = ["opt/node"] + ["usr/local/bin/" + name for name in ("node", "npm", "npx", "corepack")]
 ENGINE_PATHS = [
-    "opt/dsh", "opt/dsh-go", "etc/dsh-app",
+    "opt/dsh", "opt/node", "opt/dsh-go", "etc/dsh-app",
     "etc/profile.d/dsh-app.sh", "usr/local/lib/node_modules/pnpm",
-] + ["usr/local/bin/" + name for name in ("dsh", *PNPM_BINS)]
+] + ["usr/local/bin/" + name for name in ("dsh", "node", "npm", "npx", "corepack", *PNPM_BINS)]
 
 
 def upgrade_descriptor(abi, ubuntu_version, base_sha, deb_shas, python_sha):
@@ -1193,7 +1193,10 @@ def partition_entries(entries):
         return any(path == root or path.startswith(root + "/") for root in roots)
 
     split_node = partition_entries.split_node
-    engine_paths = ENGINE_PATHS if not split_node else ENGINE_PATHS
+    # Two-layer mode: node paths belong to the engine layer (upstream semantics,
+    # so engine-only changes reuse the cached base bytes). Three-layer mode:
+    # node goes to its own layer instead.
+    engine_paths = ENGINE_PATHS
     base, node_layer, engine = {}, {}, {}
     for p, e in entries.items():
         if owned_by(engine_paths, p):
@@ -1702,16 +1705,11 @@ def cmd_assemble(args):
         base, node_layer, engine = partition_entries(entries)
         compatibility = base_compatibility(base, with_python=bool(args.python))
         runtime_info["baseCompatibility"] = compatibility
-        # runtime.json carries the variant identity (runtimeVersion / upgrade /
-        # baseCompatibility). The BASE layer is per-distro and cache-keyed by its
-        # content, so the identity belongs there: the installer then compares the
-        # unpacked rootfs against an app-built manifest of the same base variant,
-        # while the engine archive stays byte-identical across combos. (Before,
-        # the stripped runtime.json inside the shared engine archive froze the
-        # identity of whichever combo packed it, blocking every other combo.)
+        # runtime.json stays in the engine layer (upstream semantics): engine-only
+        # changes (runtimeVersion / node / dsh / bridge) must reuse the cached
+        # base bytes. Cross-combo engine sharing keeps working because the
+        # per-combo identity lives in the manifest, not the engine archive.
         entries["etc/dsh-app/runtime.json"].data = (json.dumps(runtime_info, indent=2, sort_keys=True) + "\n").encode()
-        base["etc/dsh-app/runtime.json"] = entries["etc/dsh-app/runtime.json"]
-        engine.pop("etc/dsh-app/runtime.json", None)
         base_stats, cache = write_base_archive(base, args.base_out, args, sources)
         node_stats = write_archive(node_layer, args.node_out, args, layered=True)
         engine_stats = write_archive(engine, args.engine_out, args, layered=True)
@@ -1856,6 +1854,10 @@ def cmd_manifest(args):
     if layered and not three_layer:
         if set(report["layers"]) != {"base", "engine"} or "archive" in report or "archiveSha256" in report:
             raise SystemExit("layer report must contain only base and engine, without a single archive")
+        pattern = re.compile(r"^(base|engine)-%s\.tar\.(xz|gz)$" % re.escape(args.abi))
+        for kind, layer in report["layers"].items():
+            if layer["asset"] != kind + "-" + args.abi + ".tar." + layer["asset"].rsplit(".", 1)[1]:
+                raise SystemExit("invalid %s asset name for ABI %s" % (kind, args.abi))
     if three_layer:
         if set(report["layers"]) != {"base", "node", "engine"} or "archive" in report:
             raise SystemExit("three-layer report must contain base, node and engine")
