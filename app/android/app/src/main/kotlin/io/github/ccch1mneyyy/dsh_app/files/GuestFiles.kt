@@ -2,6 +2,7 @@ package io.github.ccch1mneyyy.dsh_app.files
 
 import android.content.Context
 import io.github.ccch1mneyyy.dsh_app.runtime.PhoneStorage
+import io.github.ccch1mneyyy.dsh_app.runtime.TawcrootLinks
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.LinkOption
@@ -45,6 +46,19 @@ object GuestFiles {
             if (!Files.isSymbolicLink(nio)) continue
             if (++links > MAX_LINKS) return null
             var target = try { Files.readSymbolicLink(nio).toString() } catch (_: Exception) { return null }
+            if (target.startsWith(TawcrootLinks.PREFIX)) {
+                // Shared-storage links must not index the app's private store.
+                if (resolved.first() == PhoneStorage.GUEST_PATH.removePrefix("/") || resolved.first() == "storage") return null
+                val token = target.removePrefix(TawcrootLinks.PREFIX)
+                if (!Regex("[0-9]+(-[0-9]+)?").matches(token)) return null
+                val obj = File(TawcrootLinks.storeOf(rootfs), "link/$token")
+                if (Files.isSymbolicLink(obj.toPath())) {
+                    // A hard-linked symlink still resolves from its guest name's parent.
+                    target = try { Files.readSymbolicLink(obj.toPath()).toString() } catch (_: Exception) { return null }
+                } else {
+                    return obj.takeIf { pending.isEmpty() && Files.isRegularFile(it.toPath(), LinkOption.NOFOLLOW_LINKS) && it.canRead() }
+                }
+            }
             resolved.removeAt(resolved.size - 1)
             if (target.startsWith("/")) {
                 val root = rootPaths.firstOrNull { target == it || target.startsWith("$it/") }
