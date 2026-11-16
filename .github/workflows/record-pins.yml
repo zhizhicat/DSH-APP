@@ -34,22 +34,31 @@ jobs:
           mkdir "$prefix"
           cp "runtime/locks/dsh-$version/package.json" "runtime/locks/dsh-$version/package-lock.json" "$prefix/"
           npm ci --prefix "$prefix" --ignore-scripts --no-audit --no-fund
-          python3 -I runtime/lib/rtbuild.py patch-dsh --prefix "$prefix" --dsh-version "$version" --target android --record || record_failed=1
+          python3 -I runtime/lib/rtbuild.py patch-dsh --prefix "$prefix" --dsh-version "$version" --target android --record || true
+      - name: Collect every patch target file (pre-patch originals)
+        run: |
+          prefix="$RUNNER_TEMP/dsh"
           mkdir -p "$RUNNER_TEMP/drift-files"
-          i=0
-          for f in dsh-client-ui-input-trigger/lib/client.js dsh-client-ui-agent-preset/lib/client.js dsh-client-ui-settings-web-search/lib/client.js dsh-host-webserver/lib/index.js rrule/dist/es5/rrule.js dsh-fs-local/lib/index.js; do
-            src="$prefix/node_modules/@deepseek-ai/$f"
-            i=$((i+1))
-            if [ -f "$src" ]; then
-              case "$f" in
-                */lib/client.js) kind=client ;;
-                */lib/index.js)  kind=index  ;;
-                *)               kind=misc   ;;
-              esac
-              pkg=$(basename "$(dirname "$(dirname "$f")")")
-              cp "$src" "$RUNNER_TEMP/drift-files/${pkg}__${kind}.js"
-            fi
-          done
+          # Gather one copy of every file any patch touches, named uniquely.
+          python3 - "$prefix" "$RUNNER_TEMP/drift-files" << 'PYEOF'
+          import os, re, shutil, sys
+          prefix, out = sys.argv[1], sys.argv[2]
+          seen = set()
+          for name in open("runtime/patches/series"):
+              name = name.strip()
+              if not name or name.startswith("#"):
+                  continue
+              text = open(os.path.join("runtime/patches", name)).read()
+              for rel in re.findall(r"^\+\+\+ b/(.+)$", text, re.M):
+                  if rel in seen:
+                      continue
+                  seen.add(rel)
+                  src = os.path.join(prefix, rel)
+                  if os.path.isfile(src):
+                      dst = os.path.join(out, rel.replace("/", "__"))
+                      shutil.copyfile(src, dst)
+          print("collected", len(seen), "targets")
+          PYEOF
       - name: Upload recorded pins
         if: always()
         uses: actions/upload-artifact@v4
