@@ -484,8 +484,19 @@ def cmd_patch_dsh(args):
         for rel, pin in pins["patches"].get(name, {}).get(args.dsh_version, {}).items():
             if rel not in selected_paths:
                 excluded_original.setdefault(rel, pin["before"])
-    for rel, expected in excluded_original.items():
-        actual = hashlib.sha256(open(os.path.join(args.prefix, rel), "rb").read()).hexdigest()
+    for rel, expected in list(excluded_original.items()):
+        path = os.path.join(args.prefix, rel)
+        if not os.path.isfile(path):
+            if not args.record:
+                sys.exit("target %s excludes changes to %s, but the file is missing from the prefix" % (args.target, rel))
+            # This DSH version no longer ships that package: drop its pin entry.
+            for name in excluded_names:
+                version_pins = pins["patches"].get(name, {}).get(args.dsh_version)
+                if isinstance(version_pins, dict):
+                    version_pins.pop(rel, None)
+            excluded_original.pop(rel)
+            continue
+        actual = hashlib.sha256(open(path, "rb").read()).hexdigest()
         if actual != expected:
             if not args.record:
                 sys.exit("target %s excludes changes to %s, but its sha256 %s is not the vetted original %s; use a fresh prefix" %
