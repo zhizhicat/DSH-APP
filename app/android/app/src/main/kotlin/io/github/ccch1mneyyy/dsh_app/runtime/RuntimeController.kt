@@ -53,7 +53,9 @@ class RuntimeController private constructor(private val app: Context) : DshProce
     private val workspaceRecovery = WorkspaceRecoveryMode(prefs.getBoolean(K_WORKSPACE_RECOVERY, false))
 
     val manifest: RuntimeManifest by lazy { RuntimeManifest.load(app) }
-    private val installer by lazy { RuntimeInstaller(app, manifest, ::note) }
+    @Volatile private var channelInstaller: RuntimeInstaller? = null
+    private val installer: RuntimeInstaller
+        get() = channelInstaller ?: RuntimeInstaller(app, manifest, ::note)
     @Volatile private var process: DshProcess? = null
     @Volatile private var lastLaunch: LaunchDiagnostics? = null
     /** The start in progress is turning PRoot's fake hard links into real files (see [L2sMigration]). */

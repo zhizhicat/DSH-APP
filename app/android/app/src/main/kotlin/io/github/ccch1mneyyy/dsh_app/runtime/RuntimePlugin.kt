@@ -22,6 +22,7 @@ import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.PluginRegistry
+import java.io.File
 
 /** Flutter bridge for the local runtime: MethodChannel `dsh/runtime`, EventChannel `dsh/runtime/events`. */
 class RuntimePlugin :

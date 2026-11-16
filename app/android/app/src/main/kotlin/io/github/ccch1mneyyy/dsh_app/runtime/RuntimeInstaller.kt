@@ -33,6 +33,7 @@ class RuntimeInstaller(
     private val manifest: RuntimeManifest,
     private val onLog: (String) -> Unit,
     private val sync: () -> Unit = ::syncFilesystems,
+    private val source: ArchiveSource = AssetArchiveSource(context),
 ) {
     val baseDir = File(context.filesDir, "runtime")
     val rootfs = File(baseDir, "rootfs")
