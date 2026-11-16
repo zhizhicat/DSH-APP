@@ -60,6 +60,7 @@ case "$DISTRO" in
   *) die "unsupported BASE distro: $BASE" ;;
 esac
 LXC_DATE="${LXC_DATE:-20261112_05:24}"   # lxc-images build stamp for debian rootfs pins
+TERMUX_REPO="${TERMUX_REPO:-https://packages.termux.dev/apt/termux-main}"
 PROOT_VERSION="5.1.107.102"
 TALLOC_VERSION="2.5.0"
 SHMEM_VERSION="0.7"

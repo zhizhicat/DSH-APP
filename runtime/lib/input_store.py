@@ -114,6 +114,24 @@ def inventory(repo, npm_locks=None, all_locks=False):
             "license": None, "license_note": "inspect original copyright/COPYING and corresponding source before redistribution",
         })
 
+    # fork: multi-distro base rootfs (Debian LXC images; no upstream checksums, PIN-mandated)
+    codename_for = {"12": "bookworm", "13": "trixie"}
+    for name, pin in pins.items():
+        m = re.fullmatch(r"debian-rootfs-(\d+)-(\d{8}_\d\d:\d\d)-(arm64|amd64)\.tar\.xz", name)
+        if m is None:
+            continue
+        ver, stamp, arch = m.groups()
+        codename = codename_for.get(ver)
+        if codename is None:
+            continue
+        urls = [values["DEBIAN_LXC_MIRRORS"].split()[0] + "/" + codename + "/" + arch + "/default/" + stamp + "/rootfs.tar.xz"]
+        add_object(objects, "sha256", pin, urls, {
+            "kind": "debian_rootfs", "name": name, "abi": "arm64-v8a" if arch == "arm64" else "x86_64",
+            "source": "build-runtime.sh:PIN[" + name + "]",
+            "license": None, "license_note": "LXC image; inspect archive copyright before redistribution",
+        }, None)
+        used_pins.add(name)
+
     for abi, ubuntu, node, termux in (("arm64-v8a", "arm64", "arm64", "aarch64"),
                                      ("x86_64", "amd64", "x64", "x86_64")):
         name = "ubuntu-base-" + values["UBUNTU_VERSION"] + "-base-" + ubuntu + ".tar.gz"
@@ -150,8 +168,15 @@ def inventory(repo, npm_locks=None, all_locks=False):
     if npm_locks:
         locks = npm_locks
     else:
+        # fork: empty DSH_VERSION means "newest lock wins" at build time; inventory
+        # must follow the same selection or it reports a lock that no build uses.
+        dsh_name = "dsh-" + values["DSH_VERSION"]
+        if not (repo / ("runtime/locks/" + dsh_name)).is_dir():
+            candidates = sorted((repo / "runtime/locks").glob("dsh-*/package-lock.json"))
+            if candidates:
+                dsh_name = candidates[-1].parent.name
         defaults = [repo / ("runtime/locks/" + name + "/package-lock.json") for name in
-                    ("dsh-" + values["DSH_VERSION"], "pnpm-" + values["PNPM_VERSION"])]
+                    (dsh_name, "pnpm-" + values["PNPM_VERSION"])]
         pnpm = json.loads(defaults[1].read_text(encoding="utf-8"))["packages"].get("node_modules/pnpm", {})
         if pnpm.get("version") != values["PNPM_VERSION"] or pnpm.get("integrity") != values["PNPM_INTEGRITY"]:
             raise InputError("current pnpm lock version/integrity does not match source pins")

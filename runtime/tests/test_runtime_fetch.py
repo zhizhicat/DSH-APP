@@ -51,7 +51,13 @@ sys.exit(status)
         return hashlib.sha256(body.encode()).hexdigest()
 
     def run_shell(self, entry, extra_env=None):
-        source, marker, suffix = SCRIPT.read_text().rpartition('\nmain "$@"')
+        # fork: build-runtime.sh ends with a run-as-script guard so build-layers can
+        # source it; strip the guard the same way before splicing the harness.
+        text = SCRIPT.read_text()
+        guard = '\n[[ "${BASH_SOURCE[0]}" != "${0}" ]] || main "$@"\n'
+        if text.endswith(guard):
+            text = text[:-len(guard)] + '\nmain "$@"\n'
+        source, marker, suffix = text.rpartition('\nmain "$@"')
         self.assertTrue(marker and not suffix.strip(), "only omit the final build entrypoint")
         harness = self.root / "exercise.sh"
         harness.write_text(source + '\nCACHE="$FETCH_TEST_ROOT/cache"\n'
