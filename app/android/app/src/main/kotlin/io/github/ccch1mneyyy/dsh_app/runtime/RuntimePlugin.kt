@@ -124,6 +124,96 @@ class RuntimePlugin :
                 }
                 result.success(null)
             }
+            "channels" -> {
+                // Variant (schema 3) channels carry an index instead of a
+                // manifest, so the flat loader skips them; merge them in so
+                // the gate and the source page can see dsh-go-layers.
+                val registry = runCatching {
+                    val flat = ChannelRegistry.load(appContext).map { c ->
+                        mapOf("id" to c.id, "name" to c.name, "isDefault" to (c.id == ChannelRegistry.defaultId(appContext)))
+                    }
+                    val layers = ChannelRegistry.layerChannels(appContext).map { c ->
+                        mapOf("id" to c.id, "name" to c.name, "isDefault" to (c.id == ChannelRegistry.defaultId(appContext)))
+                    }
+                    flat + layers
+                }.getOrElse { emptyList() }
+                result.success(registry)
+            }
+            "channelSources" -> {
+                result.success(runCatching {
+                    ChannelRegistry.sources(appContext).map { s ->
+                        mapOf("id" to s.id, "name" to s.name, "prefix" to s.prefix)
+                    }
+                }.getOrElse { emptyList() })
+            }
+            "probeChannelSource" -> {
+                // Probe the real index URL through the chosen mirror so the
+                // person sees the latency of the exact path the install uses.
+                val channelId = call.argument<String>("channelId")
+                val sourceId = call.argument<String>("sourceId") ?: ""
+                if (channelId.isNullOrEmpty()) return result.error("bad_args", "channelId required", null)
+                Thread {
+                    try {
+                        val channel = ChannelRegistry.layerChannels(appContext)
+                            .firstOrNull { it.id == channelId }
+                            ?: throw java.io.IOException("unknown layer channel")
+                        val source = ChannelRegistry.sources(appContext)
+                            .firstOrNull { it.id == sourceId } ?: ChannelRegistry.Source(sourceId, sourceId, "")
+                        result.success(LayerChannels.probe(source.prefix + channel.githubBase + channel.indexPath))
+                    } catch (e: Exception) {
+                        result.success(mapOf("ok" to false, "latencyMs" to -1, "status" to -1))
+                    }
+                }.start()
+            }
+            "layerChannelIndex" -> {
+                val channelId = call.argument<String>("channelId")
+                val sourceId = call.argument<String>("sourceId") ?: ""
+                if (channelId.isNullOrEmpty()) return result.error("bad_args", "channelId required", null)
+                Thread {
+                    try {
+                        val channel = ChannelRegistry.layerChannels(appContext)
+                            .firstOrNull { it.id == channelId }
+                            ?: throw java.io.IOException("unknown layer channel")
+                        val source = ChannelRegistry.sources(appContext)
+                            .firstOrNull { it.id == sourceId } ?: ChannelRegistry.Source(sourceId, sourceId, "")
+                        val downloads = File(appContext.cacheDir, "runtime-downloads")
+                        downloads.mkdirs()
+                        val index = LayerChannels.fetchIndex(channel, source, downloads,
+                            RuntimeDownloader(appContext, onLog = {}, isCancelled = { false }))
+                        result.success(index.toString())
+                    } catch (e: Exception) {
+                        result.error("index_failed", e.message, null)
+                    }
+                }.start()
+            }
+            "installLayerChannel" -> {
+                val id = call.argument<String>("channelId")
+                val sourceId = call.argument<String>("sourceId") ?: ""
+                val base = call.argument<String>("base")
+                val node = call.argument<String>("node")
+                val engine = call.argument<String>("engine")
+                if (id.isNullOrEmpty() || base.isNullOrEmpty() || node.isNullOrEmpty() || engine.isNullOrEmpty()) {
+                    return result.error("bad_args", "channelId/base/node/engine required", null)
+                }
+                if (controller.phase == RuntimeController.Phase.INSTALLING) return result.error("install_busy", null, null)
+                val intent = Intent(appContext, DshService::class.java).setAction(DshService.ACTION_INSTALL)
+                appContext.startForegroundService(intent)
+                controller.installLayerChannel(id, sourceId, base, node, engine) { error ->
+                    appContext.startService(Intent(appContext, DshService::class.java).setAction(DshService.ACTION_INSTALL_DONE))
+                    if (error == null) result.success(null) else result.error("install_failed", error.message, null)
+                }
+            }
+            "installChannel" -> {
+                val id = call.argument<String>("id")
+                if (id.isNullOrEmpty()) return result.error("bad_args", "channel id required", null)
+                if (controller.phase == RuntimeController.Phase.INSTALLING) return result.error("install_busy", null, null)
+                val intent = Intent(appContext, DshService::class.java).setAction(DshService.ACTION_INSTALL)
+                appContext.startForegroundService(intent)
+                controller.installChannel(id) { error ->
+                    appContext.startService(Intent(appContext, DshService::class.java).setAction(DshService.ACTION_INSTALL_DONE))
+                    if (error == null) result.success(null) else result.error("install_failed", error.message, null)
+                }
+            }
             "install" -> {
                 // A second call must not end the running unpack's foreground service.
                 if (controller.phase == RuntimeController.Phase.INSTALLING) return result.error("install_busy", null, null)

@@ -49,7 +49,12 @@ data class RuntimeManifest(
                     val abi = json.getString("abi")
                     require(abi in listOf("arm64-v8a", "x86_64"))
                     val layers = json.getJSONObject("layers")
-                    listOf("base", "engine").map { name ->
+                    // Variant channels carry a middle node layer: base, node, engine
+                    // unpack in order (later layers win). Asset names include the
+                    // version, e.g. base-ubuntu-24.04.5-<abi>.tar.xz.
+                    val names = if (layers.has("node")) listOf("base", "node", "engine")
+                                else listOf("base", "engine")
+                    names.map { name ->
                         val layer = layers.getJSONObject(name)
                         val digest = layer.getString("sha256")
                         val tarDigest = layer.getString("tarSha256")
@@ -57,7 +62,8 @@ data class RuntimeManifest(
                             digest, layer.getLong("uncompressedBytes")).also {
                             require(it.bytes > 0 && it.uncompressedBytes >= 0 &&
                                 layer.getLong("tarBytes") >= 0 &&
-                                it.asset in listOf("$name-$abi.tar.xz", "$name-$abi.tar.gz") &&
+                                it.asset.startsWith("$name-") &&
+                                (it.asset.endsWith("-$abi.tar.xz") || it.asset.endsWith("-$abi.tar.gz")) &&
                                 listOf(digest, tarDigest).all { hash -> hash.matches(Regex("[0-9a-f]{64}")) })
                         }
                     }
