@@ -38,7 +38,7 @@ if name == 'curl':
         if 'Adoptium/17/jdk/x64/linux/' not in url: raise SystemExit(97)
         print('OpenJDK17U-jdk_x64_linux_hotspot_17.0.99_9.tar.gz')
     else:
-        if scenario == 'downstream-failure' and 'Adoptium' in url:
+        if scenario == 'downstream-failure' and 'adoptium' in url.lower():
             print('fixture: JDK download failed (23)', file=sys.stderr)
             raise SystemExit(23)
         transfer = os.environ.get('TOOLCHAIN_TEST_TRANSFER')
