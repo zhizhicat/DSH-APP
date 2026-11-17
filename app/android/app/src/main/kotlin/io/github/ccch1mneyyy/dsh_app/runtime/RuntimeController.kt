@@ -16,6 +16,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import io.github.ccch1mneyyy.dsh_app.phone.skills.PhoneSkillRoute
 import java.io.File
+import java.io.IOException
 import java.util.concurrent.Executors
 
 /**
@@ -54,6 +55,9 @@ class RuntimeController private constructor(private val app: Context) : DshProce
 
     val manifest: RuntimeManifest by lazy { RuntimeManifest.load(app) }
     @Volatile private var channelInstaller: RuntimeInstaller? = null
+    @Volatile private var channelManifest: RuntimeManifest? = null
+    val manifest: RuntimeManifest
+        get() = channelManifest ?: RuntimeManifest.load(app)
     private val installer: RuntimeInstaller
         get() = channelInstaller ?: RuntimeInstaller(app, manifest, ::note)
     @Volatile private var process: DshProcess? = null
