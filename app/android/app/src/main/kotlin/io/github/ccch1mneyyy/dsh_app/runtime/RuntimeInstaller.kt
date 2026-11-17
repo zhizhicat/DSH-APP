@@ -28,7 +28,7 @@ import org.json.JSONObject
  * First install creates the system; upgrades replace only app-owned engine paths.
  * The user's Linux system, package databases and home are never rebuilt implicitly.
  */
-class RuntimeInstaller(
+internal class RuntimeInstaller(
     private val context: Context,
     private val manifest: RuntimeManifest,
     private val onLog: (String) -> Unit,
