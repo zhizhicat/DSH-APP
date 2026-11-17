@@ -121,7 +121,36 @@ class _DownloadSourceStepPageState extends ConsumerState<DownloadSourceStepPage>
   }
 
 
+  /// 选源入口：失败时按剩余源自动故障转移（探测延迟低者优先，最多轮完）。
   Future<void> _selectSource(String sourceId, LayersChoice? preferred) async {
+    final tried = <String>{sourceId};
+    var current = sourceId;
+    while (true) {
+      final failed = await _fetchIndexOnce(current, preferred);
+      if (!failed) return;
+      final next = _nextSourceAfter(current, tried);
+      if (next == null || !mounted) return;
+      tried.add(next);
+      current = next;
+      if (mounted) setState(() => _sourceId = next);
+    }
+  }
+
+  String? _nextSourceAfter(String id, Set<String> tried) {
+    final pool = _layerSources['base'] ?? _sources;
+    // 探测可用且延迟最低的未试源优先；没有探测结果时按池序。
+    final candidates = pool.where((s) => !tried.contains(s.id)).toList()
+      ..sort((a, b) {
+        final pa = _layerProbes['base:${a.id}'], pb = _layerProbes['base:${b.id}'];
+        final la = (pa != null && pa.ok) ? (pa.latencyMs ?? 9999) : 99999;
+        final lb = (pb != null && pb.ok) ? (pb.latencyMs ?? 9999) : 99999;
+        return la.compareTo(lb);
+      });
+    return candidates.isEmpty ? null : candidates.first.id;
+  }
+
+  /// 拉一次 index；返回 true=失败（可故障转移）。
+  Future<bool> _fetchIndexOnce(String sourceId, LayersChoice? preferred) async {
     setState(() {
       _sourceId = sourceId;
       _index = null;
@@ -131,7 +160,7 @@ class _DownloadSourceStepPageState extends ConsumerState<DownloadSourceStepPage>
     final channelId = await _layerChannel();
     if (channelId == null) {
       if (mounted) setState(() { _indexLoading = false; _indexError = context.l10n.setupSourceIndexFailed; });
-      return;
+      return true;
     }
     Object? indexError;
     LayersIndex? index;
@@ -140,7 +169,7 @@ class _DownloadSourceStepPageState extends ConsumerState<DownloadSourceStepPage>
     } catch (e) {
       indexError = e;
     }
-    if (!mounted) return;
+    if (!mounted) return true;
     setState(() {
       _indexLoading = false;
       _index = index;
@@ -152,6 +181,7 @@ class _DownloadSourceStepPageState extends ConsumerState<DownloadSourceStepPage>
         _choice = _validChoice(preferred, index) ?? LayersChoice.defaultFor(index);
       }
     });
+    return index == null;
   }
 
   /// Applies a layer pick and remembers it right away, so leaving mid-download
@@ -249,27 +279,55 @@ class _DownloadSourceStepPageState extends ConsumerState<DownloadSourceStepPage>
           message: l10n.setupSourceMessage,
         ),
         const SizedBox(height: 28),
-        if (_indexLoading)
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 24),
-            child: Center(
-              child: Column(children: [
-                CircularProgressIndicator(strokeWidth: 2),
-                SizedBox(height: 12),
-              ]),
+        // 索引未到位也先亮三卡：源 chips 可选可换源重试，版本行显示占位。
+        if (_indexLoading || _indexError != null || _index == null) ...[
+          if (_indexError != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Text(_indexError!, style: Theme.of(context).textTheme.bodySmall),
             ),
-          )
-        else if (_indexError != null) ...[
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 16),
-            child: Text(_indexError!, style: Theme.of(context).textTheme.bodySmall),
+          _LayerCard(
+            key: const ValueKey('setup-layer-base-skeleton'),
+            label: l10n.setupSourceRootfs,
+            variants: const [],
+            selectedKey: '',
+            onVariant: (_) {},
+            sources: _layerSources['base'] ?? _sources,
+            selectedSourceId: _sourceId,
+            onSource: (id) => unawaited(_selectSource(id, _choice)),
+            probes: _layerProbes,
+            layer: 'base',
+            loading: _indexError != null ? l10n.setupSourceIndexFailed : '…',
           ),
-          if (widget.onDefault != null)
-            OutlinedButton(
-              onPressed: widget.onDefault,
-              style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
-              child: Text(l10n.setupSourceUseDefault),
-            ),
+          const SizedBox(height: 12),
+          _LayerCard(
+            key: const ValueKey('setup-layer-node-skeleton'),
+            label: l10n.setupSourceNode,
+            variants: const [],
+            selectedKey: '',
+            onVariant: (_) {},
+            sources: _layerSources['node'] ?? const [],
+            selectedSourceId: _nodeSourceId ?? _sourceId,
+            onSource: (id) => _pickLayerSource('node', id),
+            probes: _layerProbes,
+            layer: 'node',
+            loading: '…',
+          ),
+          const SizedBox(height: 12),
+          _LayerCard(
+            key: const ValueKey('setup-layer-engine-skeleton'),
+            label: l10n.setupSourceDsh,
+            variants: const [],
+            selectedKey: '',
+            onVariant: (_) {},
+            sources: _layerSources['engine'] ?? const [],
+            selectedSourceId: _engineSourceId ?? _sourceId,
+            onSource: (id) => _pickLayerSource('engine', id),
+            probes: _layerProbes,
+            layer: 'engine',
+            loading: '…',
+          ),
+          const SizedBox(height: 12),
         ]
         else if (_index != null && _choice != null) ...[
           // v1.5 三层卡片：每层 = 版本下拉 + 该层专属源 chips（各配各的镜像）。
@@ -354,6 +412,7 @@ class _LayerCard extends StatelessWidget {
     required this.onSource,
     required this.probes,
     required this.layer,
+    this.loading = '',
   });
   final String label;
   final List<LayerVariant> variants;
@@ -364,6 +423,7 @@ class _LayerCard extends StatelessWidget {
   final ValueChanged<String> onSource;
   final Map<String, _ProbeState> probes;
   final String layer;
+  final String loading;
 
   @override
   Widget build(BuildContext context) {
@@ -371,12 +431,17 @@ class _LayerCard extends StatelessWidget {
     return SettingsSection(
       margin: EdgeInsets.zero,
       children: [
-        _VariantRow(
-          label: label,
-          variants: variants,
-          selectedKey: selectedKey,
-          onChanged: onVariant,
-        ),
+        variants.isEmpty
+            ? Padding(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                child: Text(loading, style: theme.textTheme.bodySmall),
+              )
+            : _VariantRow(
+                label: label,
+                variants: variants,
+                selectedKey: selectedKey,
+                onChanged: onVariant,
+              ),
         if (sources.isNotEmpty)
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),

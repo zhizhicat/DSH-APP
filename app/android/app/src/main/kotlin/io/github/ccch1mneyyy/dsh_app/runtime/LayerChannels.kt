@@ -43,6 +43,12 @@ internal object LayerChannels {
         downloader: RuntimeDownloader,
     ): JSONObject {
         val url = source.prefix + channel.githubBase + channel.indexPath
+        // 先探测（8s）：DownloadManager 的连接阶段没有短超时可注入，
+        // 不通的源先在这里快速失败，让 UI 故障转移到下一个源。
+        val probe = probe(url, timeoutMs = 8_000)
+        if (probe["ok"] != true) {
+            throw IOException("source unreachable: sourceId='${source.id}' url=$url status=${probe["status"]}")
+        }
         val file = File(downloads, "layers-index.json")
         try {
             // force: the index is small and freshness-sensitive; without a pinned sha
