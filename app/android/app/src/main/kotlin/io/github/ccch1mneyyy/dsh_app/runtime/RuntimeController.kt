@@ -148,7 +148,9 @@ class RuntimeController private constructor(private val app: Context) : DshProce
             if (installer.isCurrent()) Phase.INSTALLED else Phase.NOT_INSTALLED
         } catch (e: Exception) {
             error = "manifest: ${e.message}"
-            Phase.ERROR
+            // A noruntime bundle without an installed runtime is a normal first
+            // run: onboarding picks a download channel instead of surfacing an error.
+            if (bundledManifest == null) Phase.NOT_INSTALLED else Phase.ERROR
         }
     }
 
