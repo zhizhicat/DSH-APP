@@ -262,7 +262,7 @@ class RuntimePlugin :
                 controller.installChannel(id) { error ->
                     appContext.startService(Intent(appContext, DshService::class.java).setAction(DshService.ACTION_INSTALL_DONE))
                     if (error == null) result.success(null) else result.error("install_failed", error.message, null)
-                }, nodeSourceId, engineSourceId)
+                }
             }
             "install" -> {
                 // A second call must not end the running unpack's foreground service.
