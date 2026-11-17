@@ -235,6 +235,14 @@ class LocalRuntimeController extends Notifier<LocalRuntimeState> {
     );
   }
 
+  /// v1.5 三层分源：每层各自的源池（{base,node,engine}）。
+  Future<Map<String, List<RuntimeSourceInfo>>> layerSources() => _bridge.layerSources();
+
+  /// 按层探测一个源（gh 镜像探 index URL，node-dist 探 SHASUMS256.txt）。
+  Future<Map<Object?, Object?>> probeLayerSource(
+          String channelId, String layer, String sourceId, {String? nodeVersion}) =>
+      _bridge.probeLayerSource(channelId, layer, sourceId, nodeVersion: nodeVersion);
+
   /// noruntime first install: download the channel, then unpack.
   Future<void> installChannel(RuntimeChannelInfo channel) {
     ref.read(readListCredentialEpochProvider.notifier).advance();
