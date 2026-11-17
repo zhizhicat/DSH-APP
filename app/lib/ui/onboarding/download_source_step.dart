@@ -43,7 +43,6 @@ class _DownloadSourceStepPageState extends ConsumerState<DownloadSourceStepPage>
   Map<String, List<RuntimeSourceInfo>> _layerSources = const {};
   /// v1.5 三层分源探测结果：'layer:sourceId' -> state。
   final Map<String, _ProbeState> _layerProbes = {};
-  final Map<String, _ProbeState> _probes = {};
   String? _layerChannelId;
   String? _sourceId;
   String? _nodeSourceId;
@@ -95,9 +94,7 @@ class _DownloadSourceStepPageState extends ConsumerState<DownloadSourceStepPage>
     if (sourceId != null && channelId != null) {
       unawaited(_selectSource(sourceId, saved.choice));
     }
-    for (final s in sources) {
-      unawaited(_probe(s));
-    }
+
     // 三层分源探测（gh 镜像三层可各选不同）。
     for (final layer in const ['base', 'node', 'engine']) {
       for (final src in _layerSources[layer] ?? const <RuntimeSourceInfo>[]) {
@@ -123,16 +120,6 @@ class _DownloadSourceStepPageState extends ConsumerState<DownloadSourceStepPage>
     });
   }
 
-  Future<void> _probe(RuntimeSourceInfo source) async {
-    final channelId = await _layerChannel();
-    if (channelId == null || !mounted) return;
-    final result = await ref.read(localRuntimeProvider.notifier).probeSource(channelId, source.id);
-    if (!mounted) return;
-    setState(() {
-      _probes[source.id] = (_probes[source.id] ?? const _ProbeState())
-          .withResult(ok: result['ok'] == true, latencyMs: (result['latencyMs'] as num?)?.toInt() ?? -1);
-    });
-  }
 
   Future<void> _selectSource(String sourceId, LayersChoice? preferred) async {
     setState(() {
@@ -262,24 +249,15 @@ class _DownloadSourceStepPageState extends ConsumerState<DownloadSourceStepPage>
           message: l10n.setupSourceMessage,
         ),
         const SizedBox(height: 28),
-        SettingsSection(
-          key: const ValueKey('setup-source-card'),
-          margin: EdgeInsets.zero,
-          children: [
-            for (final source in _sources)
-              _SourceRow(
-                source: source,
-                probe: _probes[source.id] ?? const _ProbeState(),
-                selectedId: _sourceId,
-                onTap: () => unawaited(_selectSource(source.id, _choice)),
-              ),
-          ],
-        ),
-        const SizedBox(height: 16),
         if (_indexLoading)
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 24),
-            child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+            child: Center(
+              child: Column(children: [
+                CircularProgressIndicator(strokeWidth: 2),
+                SizedBox(height: 12),
+              ]),
+            ),
           )
         else if (_indexError != null) ...[
           Padding(
@@ -362,37 +340,6 @@ class _DownloadSourceStepPageState extends ConsumerState<DownloadSourceStepPage>
   }
 }
 
-class _SourceRow extends StatelessWidget {
-  const _SourceRow({required this.source, required this.probe, required this.selectedId, required this.onTap});
-  final RuntimeSourceInfo source;
-  final _ProbeState probe;
-  final String? selectedId;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    Widget? trailing;
-    if (probe.pending) {
-      trailing = const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2));
-    } else if (probe.ok) {
-      trailing = Text('${probe.latencyMs}ms',
-          style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.primary));
-    } else {
-      trailing = Icon(AppIcons.close, size: 16, color: theme.colorScheme.error);
-    }
-    return ListTile(
-      dense: true,
-      title: Text(source.name),
-      trailing: trailing,
-      leading: Icon(
-        selectedId == source.id ? AppIcons.radioOn : AppIcons.radioOff,
-        size: 20,
-      ),
-      onTap: onTap,
-    );
-  }
-}
 
 /// 一层 = 版本下拉 + 该层专属源 chips（每 chip 显示按层探测的延迟/可用性）。
 class _LayerCard extends StatelessWidget {
