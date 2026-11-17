@@ -339,7 +339,8 @@ class RuntimeController private constructor(private val app: Context) : DshProce
      */
     @Synchronized fun installLayerChannel(
         channelId: String, sourceId: String, baseKey: String, nodeKey: String, engineKey: String,
-        onDone: (Throwable?) -> Unit,
+        onDone: (Throwable?) -> Unit, nodeSourceId: String? = null,
+        engineSourceId: String? = null,
     ) {
         if (phase == Phase.INSTALLING) return onDone(null)
         if (process != null || resetting || phase in setOf(Phase.STARTING, Phase.RUNNING, Phase.STOPPING)) {
@@ -380,9 +381,27 @@ class RuntimeController private constructor(private val app: Context) : DshProce
                     "base and node already active", "system")
                 log("[dsh-app] layers ${baseKey}/${nodeKey}/${engineKey}: downloading ${toDownload.size} layer(s) " +
                     "(${toDownload.sumOf { it.bytes }.let { b -> if (b > 0) b / (1024 * 1024) else -1 }}MB)", "system")
+                // v1.5 三层分源：base / node / engine 各自路由所选 gh 镜像前缀。
+                // 层归属按 asset 命名：base-<distro>- / node-v / engine-dsh（build-layers 约定）。
+                // 未指定该层专属源时回落到全局 source（与旧行为一致）。
+                val fallback = source.prefix
+                val layerPrefix = mapOf(
+                    "base" to sourceId.let { LayerSources.find("base", it)?.prefix ?: fallback },
+                    "node" to (nodeSourceId ?: sourceId).let { LayerSources.find("node", it)?.prefix ?: fallback },
+                    "engine" to (engineSourceId ?: sourceId).let { LayerSources.find("engine", it)?.prefix ?: fallback },
+                )
+                fun layerOf(asset: String): String = when {
+                    asset.startsWith("base-") -> "base"
+                    asset.startsWith("node-v") -> "node"
+                    asset.startsWith("engine-") -> "engine"
+                    else -> "base"
+                }
                 for (archive in toDownload) {
+                    val layer = layerOf(archive.asset)
+                    val prefix = layerPrefix[layer] ?: fallback
+                    if (prefix != fallback) log("[dsh-app] $layer layer via dedicated source prefix", "system")
                     downloader.download(
-                        source.prefix + channel.githubBase + archive.asset,
+                        prefix + channel.githubBase + archive.asset,
                         File(downloads, archive.asset), archive.sha256, archive.bytes,
                     ) { done, total ->
                         emit(mapOf("type" to "progress", "step" to "download", "done" to done, "total" to total))

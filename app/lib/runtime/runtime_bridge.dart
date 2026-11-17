@@ -644,6 +644,36 @@ class RuntimeBridge {
     return (raw! as Map).cast<Object?, Object?>();
   }
 
+  // ---- v1.5 三层分源 ----
+
+  /// Per-layer source pools: {base: [...], node: [...], engine: [...]}.
+  Future<Map<String, List<RuntimeSourceInfo>>> layerSources() async {
+    final raw = await _methods.invokeMapMethod<Object?, Object?>('layerSources');
+    return {
+      for (final e in raw?.entries ?? const <MapEntry<Object?, Object?>>[])
+        e.key! as String: [
+          for (final item in (e.value! as List))
+            RuntimeSourceInfo.fromMap((item! as Map).cast<Object?, Object?>()),
+        ],
+    };
+  }
+
+  /// Probe one layer's source (gh mirror probes the index URL, node-dist its SHASUMS).
+  Future<Map<Object?, Object?>> probeLayerSource(
+    String channelId,
+    String layer,
+    String sourceId, {
+    String? nodeVersion,
+  }) async {
+    final raw = await _methods.invokeMethod<Object?>('probeLayerSource', {
+      'channelId': channelId,
+      'layer': layer,
+      'sourceId': sourceId,
+      if (nodeVersion != null) 'nodeVersion': nodeVersion,
+    });
+    return (raw! as Map).cast<Object?, Object?>();
+  }
+
   /// The layers index for a variant channel (raw JSON string; parsed in the state layer).
   Future<String> layerChannelIndex(String channelId, String sourceId) async {
     final raw = await _methods.invokeMethod<String>('layerChannelIndex', {'channelId': channelId, 'sourceId': sourceId});
@@ -658,6 +688,8 @@ class RuntimeBridge {
     required String base,
     required String node,
     required String engine,
+    String? nodeSourceId,
+    String? engineSourceId,
   }) =>
       _methods.invokeMethod<void>('installLayerChannel', {
         'channelId': channelId,
@@ -665,6 +697,8 @@ class RuntimeBridge {
         'base': base,
         'node': node,
         'engine': engine,
+        if (nodeSourceId != null) 'nodeSourceId': nodeSourceId,
+        if (engineSourceId != null) 'engineSourceId': engineSourceId,
       });
 
   /// [phoneStorage] mounts the phone's shared storage at /sdcard (needs [requestStorage] first).

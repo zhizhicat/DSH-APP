@@ -40,9 +40,14 @@ class DownloadSourceStepPage extends ConsumerStatefulWidget {
 
 class _DownloadSourceStepPageState extends ConsumerState<DownloadSourceStepPage> {
   List<RuntimeSourceInfo> _sources = const [];
+  Map<String, List<RuntimeSourceInfo>> _layerSources = const {};
+  /// v1.5 三层分源探测结果：'layer:sourceId' -> state。
+  final Map<String, _ProbeState> _layerProbes = {};
   final Map<String, _ProbeState> _probes = {};
   String? _layerChannelId;
   String? _sourceId;
+  String? _nodeSourceId;
+  String? _engineSourceId;
   LayersIndex? _index;
   LayersChoice? _choice;
   bool _indexLoading = false;
@@ -69,19 +74,53 @@ class _DownloadSourceStepPageState extends ConsumerState<DownloadSourceStepPage>
   Future<void> _init() async {
     final controller = ref.read(localRuntimeProvider.notifier);
     final sources = await controller.channelSources();
+    Map<String, List<RuntimeSourceInfo>> layerSources = const {};
+    try {
+      layerSources = await controller.layerSources();
+    } catch (_) {/* 三层源池是 v1.5 新桥：旧原生回退到单源池 */}
     final channelId = await _layerChannel();
     if (!mounted) return;
-    setState(() => _sources = sources);
+    setState(() {
+      _sources = sources;
+      _layerSources = layerSources;
+    });
     final saved = await LocalRuntimeController.loadVariantPrefs();
     final sourceId = _sources.any((s) => s.id == saved.sourceId)
         ? saved.sourceId
         : (_sources.isEmpty ? null : _sources.first.id);
+    _nodeSourceId = _validLayerSource('node', saved.nodeSourceId) ??
+        _validLayerSource('node', sourceId);
+    _engineSourceId = _validLayerSource('engine', saved.engineSourceId) ??
+        _validLayerSource('engine', sourceId);
     if (sourceId != null && channelId != null) {
       unawaited(_selectSource(sourceId, saved.choice));
     }
     for (final s in sources) {
       unawaited(_probe(s));
     }
+    // 三层分源探测（gh 镜像三层可各选不同）。
+    for (final layer in const ['base', 'node', 'engine']) {
+      for (final src in _layerSources[layer] ?? const <RuntimeSourceInfo>[]) {
+        unawaited(_probeLayer(layer, src.id, nodeVersion: saved.choice?.node));
+      }
+    }
+  }
+
+  /// 该 id 在此层池里有效则原样返回，否则 null。
+  String? _validLayerSource(String layer, String? id) =>
+      (id != null && (_layerSources[layer] ?? const []).any((s) => s.id == id)) ? id : null;
+
+  Future<void> _probeLayer(String layer, String sourceId, {String? nodeVersion}) async {
+    final channelId = await _layerChannel();
+    if (channelId == null || !mounted) return;
+    final result = await ref
+        .read(localRuntimeProvider.notifier)
+        .probeLayerSource(channelId, layer, sourceId, nodeVersion: nodeVersion);
+    if (!mounted) return;
+    setState(() {
+      _layerProbes['$layer:$sourceId'] = (_layerProbes['$layer:$sourceId'] ?? const _ProbeState())
+          .withResult(ok: result['ok'] == true, latencyMs: (result['latencyMs'] as num?)?.toInt() ?? -1);
+    });
   }
 
   Future<void> _probe(RuntimeSourceInfo source) async {
@@ -134,7 +173,33 @@ class _DownloadSourceStepPageState extends ConsumerState<DownloadSourceStepPage>
     setState(() => _choice = choice);
     final sourceId = _sourceId;
     if (sourceId != null) {
-      unawaited(LocalRuntimeController.saveVariantPrefs(sourceId: sourceId, choice: choice));
+      unawaited(LocalRuntimeController.saveVariantPrefs(
+        sourceId: sourceId,
+        choice: choice,
+        nodeSourceId: _nodeSourceId,
+        engineSourceId: _engineSourceId,
+      ));
+    }
+  }
+
+  void _pickLayerSource(String layer, String id) {
+    setState(() {
+      switch (layer) {
+        case 'node':
+          _nodeSourceId = id;
+        case 'engine':
+          _engineSourceId = id;
+      }
+    });
+    final sourceId = _sourceId;
+    final choice = _choice;
+    if (sourceId != null && choice != null) {
+      unawaited(LocalRuntimeController.saveVariantPrefs(
+        sourceId: sourceId,
+        choice: choice,
+        nodeSourceId: _nodeSourceId,
+        engineSourceId: _engineSourceId,
+      ));
     }
   }
 
@@ -229,29 +294,44 @@ class _DownloadSourceStepPageState extends ConsumerState<DownloadSourceStepPage>
             ),
         ]
         else if (_index != null && _choice != null) ...[
-          SettingsSection(
-            key: const ValueKey('setup-variants-card'),
-            margin: EdgeInsets.zero,
-            children: [
-              _VariantRow(
-                label: l10n.setupSourceRootfs,
-                variants: _index!.base,
-                selectedKey: _choice!.base,
-                onChanged: (k) => _pick(LayersChoice(base: k, node: _choice!.node, engine: _choice!.engine)),
-              ),
-              _VariantRow(
-                label: l10n.setupSourceNode,
-                variants: _index!.node,
-                selectedKey: _choice!.node,
-                onChanged: (k) => _pick(LayersChoice(base: _choice!.base, node: k, engine: _choice!.engine)),
-              ),
-              _VariantRow(
-                label: l10n.setupSourceDsh,
-                variants: _index!.engine,
-                selectedKey: _choice!.engine,
-                onChanged: (k) => _pickEngine(k),
-              ),
-            ],
+          // v1.5 三层卡片：每层 = 版本下拉 + 该层专属源 chips（各配各的镜像）。
+          _LayerCard(
+            key: const ValueKey('setup-layer-base'),
+            label: l10n.setupSourceRootfs,
+            variants: _index!.base,
+            selectedKey: _choice!.base,
+            onVariant: (k) => _pick(LayersChoice(base: k, node: _choice!.node, engine: _choice!.engine)),
+            sources: _layerSources['base'] ?? const [],
+            selectedSourceId: _sourceId,
+            onSource: (id) => unawaited(_selectSource(id, _choice)),
+            probes: _layerProbes,
+            layer: 'base',
+          ),
+          const SizedBox(height: 12),
+          _LayerCard(
+            key: const ValueKey('setup-layer-node'),
+            label: l10n.setupSourceNode,
+            variants: _index!.node,
+            selectedKey: _choice!.node,
+            onVariant: (k) => _pick(LayersChoice(base: _choice!.base, node: k, engine: _choice!.engine)),
+            sources: _layerSources['node'] ?? const [],
+            selectedSourceId: _nodeSourceId ?? _sourceId,
+            onSource: (id) => _pickLayerSource('node', id),
+            probes: _layerProbes,
+            layer: 'node',
+          ),
+          const SizedBox(height: 12),
+          _LayerCard(
+            key: const ValueKey('setup-layer-engine'),
+            label: l10n.setupSourceDsh,
+            variants: _index!.engine,
+            selectedKey: _choice!.engine,
+            onVariant: (k) => _pickEngine(k),
+            sources: _layerSources['engine'] ?? const [],
+            selectedSourceId: _engineSourceId ?? _sourceId,
+            onSource: (id) => _pickLayerSource('engine', id),
+            probes: _layerProbes,
+            layer: 'engine',
           ),
           const SizedBox(height: 12),
           Text(
@@ -265,7 +345,12 @@ class _DownloadSourceStepPageState extends ConsumerState<DownloadSourceStepPage>
           onPressed: _sourceId == null || _choice == null
               ? null
               : () async {
-                  await LocalRuntimeController.saveVariantPrefs(sourceId: _sourceId!, choice: _choice!);
+                  await LocalRuntimeController.saveVariantPrefs(
+                    sourceId: _sourceId!,
+                    choice: _choice!,
+                    nodeSourceId: _nodeSourceId,
+                    engineSourceId: _engineSourceId,
+                  );
                   widget.onDone(_sourceId!, _choice!);
                 },
           style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
@@ -305,6 +390,116 @@ class _SourceRow extends StatelessWidget {
         size: 20,
       ),
       onTap: onTap,
+    );
+  }
+}
+
+/// 一层 = 版本下拉 + 该层专属源 chips（每 chip 显示按层探测的延迟/可用性）。
+class _LayerCard extends StatelessWidget {
+  const _LayerCard({
+    super.key,
+    required this.label,
+    required this.variants,
+    required this.selectedKey,
+    required this.onVariant,
+    required this.sources,
+    required this.selectedSourceId,
+    required this.onSource,
+    required this.probes,
+    required this.layer,
+  });
+  final String label;
+  final List<LayerVariant> variants;
+  final String selectedKey;
+  final ValueChanged<String> onVariant;
+  final List<RuntimeSourceInfo> sources;
+  final String? selectedSourceId;
+  final ValueChanged<String> onSource;
+  final Map<String, _ProbeState> probes;
+  final String layer;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return SettingsSection(
+      margin: EdgeInsets.zero,
+      children: [
+        _VariantRow(
+          label: label,
+          variants: variants,
+          selectedKey: selectedKey,
+          onChanged: onVariant,
+        ),
+        if (sources.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final src in sources)
+                  _SourceChip(
+                    source: src,
+                    layer: layer,
+                    probe: probes['$layer:${src.id}'] ?? const _ProbeState(),
+                    selected: selectedSourceId == src.id,
+                    onTap: () => onSource(src.id),
+                    theme: theme,
+                  ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _SourceChip extends StatelessWidget {
+  const _SourceChip({
+    required this.source,
+    required this.layer,
+    required this.probe,
+    required this.selected,
+    required this.onTap,
+    required this.theme,
+  });
+  final RuntimeSourceInfo source;
+  final String layer;
+  final _ProbeState probe;
+  final bool selected;
+  final VoidCallback onTap;
+  final ThemeData theme;
+
+  @override
+  Widget build(BuildContext context) {
+    Widget? tail;
+    if (probe.pending) {
+      tail = const SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 1.5));
+    } else if (probe.ok) {
+      tail = Text('${probe.latencyMs}ms',
+          style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.primary));
+    } else {
+      tail = Icon(AppIcons.close, size: 12, color: theme.colorScheme.error);
+    }
+    return InkWell(
+      borderRadius: BorderRadius.circular(99),
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(99),
+          border: Border.all(
+            color: selected ? theme.colorScheme.primary : theme.dividerColor,
+            width: selected ? 1.6 : 1,
+          ),
+          color: selected ? theme.colorScheme.primary.withOpacity(0.08) : null,
+        ),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          Text(source.name, style: theme.textTheme.labelMedium),
+          const SizedBox(width: 6),
+          tail!,
+        ]),
+      ),
     );
   }
 }

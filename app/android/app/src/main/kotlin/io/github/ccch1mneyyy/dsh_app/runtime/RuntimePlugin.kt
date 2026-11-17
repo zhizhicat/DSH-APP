@@ -26,6 +26,22 @@ import java.io.File
 
 /** Flutter bridge for the local runtime: MethodChannel `dsh/runtime`, EventChannel `dsh/runtime/events`. */
 class RuntimePlugin :
+
+/** JSONObject{layer:[{...}]} -> Map<String, List<Map<String,Any?>>> for the Flutter bridge. */
+private fun jsonToMapList(o: org.json.JSONObject): Map<String, List<Map<String, Any?>>> {
+    val out = mutableMapOf<String, List<Map<String, Any?>>>()
+    for (k in o.keys()) {
+        val arr = o.getJSONArray(k)
+        val list = (0 until arr.length()).map { i ->
+            val e = arr.getJSONObject(i)
+            e.keys().asSequence().associateWith { key ->
+                when (val v = e.get(key)) { is Int -> v.toLong(); else -> v }
+            }
+        }
+        out[k] = list
+    }
+    return out
+}
     FlutterPlugin,
     ActivityAware,
     MethodChannel.MethodCallHandler,
@@ -147,6 +163,37 @@ class RuntimePlugin :
                     }
                 }.getOrElse { emptyList() })
             }
+            "layerSources" -> {
+                // v1.5 三层分源：每层各自的源池（experimental 源已过滤）。
+                result.success(jsonToMapList(LayerSources.toJson()))
+            }
+            "probeLayerSource" -> {
+                // 按层探测：gh-mirror 探真实 index 路径（与安装走的同一条路）；
+                // node-dist 探该源 SHASUMS256.txt（B 波启用后生效）。
+                val channelId = call.argument<String>("channelId")
+                val layer = call.argument<String>("layer") ?: "base"
+                val sourceId = call.argument<String>("sourceId") ?: ""
+                val nodeVersion = call.argument<String>("nodeVersion")
+                if (channelId.isNullOrEmpty()) return result.error("bad_args", "channelId required", null)
+                Thread {
+                    try {
+                        val channel = ChannelRegistry.layerChannels(appContext)
+                            .firstOrNull { it.id == channelId }
+                            ?: throw java.io.IOException("unknown layer channel")
+                        val src = LayerSources.find(layer, sourceId)
+                            ?: throw java.io.IOException("unknown $layer source '$sourceId'")
+                        val url = when {
+                            src.kind == "node-dist" && nodeVersion != null ->
+                                LayerSources.nodeProbeUrl(src, nodeVersion.removePrefix("node-v"))
+                            layer == "base" -> src.prefix + channel.githubBase + channel.indexPath
+                            else -> src.prefix + channel.githubBase + channel.indexPath
+                        }
+                        result.success(LayerChannels.probe(url))
+                    } catch (e: Exception) {
+                        result.success(mapOf("ok" to false, "latencyMs" to -1, "status" to -1))
+                    }
+                }.start()
+            }
             "probeChannelSource" -> {
                 // Probe the real index URL through the chosen mirror so the
                 // person sees the latency of the exact path the install uses.
@@ -193,16 +240,18 @@ class RuntimePlugin :
                 val base = call.argument<String>("base")
                 val node = call.argument<String>("node")
                 val engine = call.argument<String>("engine")
+                val nodeSourceId = call.argument<String>("nodeSourceId")
+                val engineSourceId = call.argument<String>("engineSourceId")
                 if (id.isNullOrEmpty() || base.isNullOrEmpty() || node.isNullOrEmpty() || engine.isNullOrEmpty()) {
                     return result.error("bad_args", "channelId/base/node/engine required", null)
                 }
                 if (controller.phase == RuntimeController.Phase.INSTALLING) return result.error("install_busy", null, null)
                 val intent = Intent(appContext, DshService::class.java).setAction(DshService.ACTION_INSTALL)
                 appContext.startForegroundService(intent)
-                controller.installLayerChannel(id, sourceId, base, node, engine) { error ->
+                controller.installLayerChannel(id, sourceId, base, node, engine, { error ->
                     appContext.startService(Intent(appContext, DshService::class.java).setAction(DshService.ACTION_INSTALL_DONE))
                     if (error == null) result.success(null) else result.error("install_failed", error.message, null)
-                }
+                }, nodeSourceId, engineSourceId)
             }
             "installChannel" -> {
                 val id = call.argument<String>("id")
@@ -213,7 +262,7 @@ class RuntimePlugin :
                 controller.installChannel(id) { error ->
                     appContext.startService(Intent(appContext, DshService::class.java).setAction(DshService.ACTION_INSTALL_DONE))
                     if (error == null) result.success(null) else result.error("install_failed", error.message, null)
-                }
+                }, nodeSourceId, engineSourceId)
             }
             "install" -> {
                 // A second call must not end the running unpack's foreground service.

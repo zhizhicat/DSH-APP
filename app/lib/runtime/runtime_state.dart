@@ -183,6 +183,8 @@ class LocalRuntimeController extends Notifier<LocalRuntimeState> {
     required String channelId,
     required String sourceId,
     required LayersChoice choice,
+    String? nodeSourceId,
+    String? engineSourceId,
   }) {
     ref.read(readListCredentialEpochProvider.notifier).advance();
     return _bridge.installLayerChannel(
@@ -191,6 +193,8 @@ class LocalRuntimeController extends Notifier<LocalRuntimeState> {
       base: choice.base,
       node: choice.node,
       engine: choice.engine,
+      nodeSourceId: nodeSourceId,
+      engineSourceId: engineSourceId,
     );
   }
 
@@ -199,22 +203,36 @@ class LocalRuntimeController extends Notifier<LocalRuntimeState> {
   static Future<void> saveVariantPrefs({
     required String sourceId,
     required LayersChoice choice,
+    String? nodeSourceId,
+    String? engineSourceId,
   }) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('runtime.variant.sourceId', sourceId);
     await prefs.setString('runtime.variant.base', choice.base);
     await prefs.setString('runtime.variant.node', choice.node);
     await prefs.setString('runtime.variant.engine', choice.engine);
+    if (nodeSourceId != null) await prefs.setString('runtime.variant.nodeSourceId', nodeSourceId);
+    if (engineSourceId != null) await prefs.setString('runtime.variant.engineSourceId', engineSourceId);
   }
 
-  static Future<({String sourceId, LayersChoice? choice})> loadVariantPrefs() async {
+  static Future<({String sourceId, String? nodeSourceId, String? engineSourceId, LayersChoice? choice})>
+      loadVariantPrefs() async {
     final prefs = await SharedPreferences.getInstance();
     final sourceId = prefs.getString('runtime.variant.sourceId') ?? '';
+    final nodeSourceId = prefs.getString('runtime.variant.nodeSourceId');
+    final engineSourceId = prefs.getString('runtime.variant.engineSourceId');
     final base = prefs.getString('runtime.variant.base');
     final node = prefs.getString('runtime.variant.node');
     final engine = prefs.getString('runtime.variant.engine');
-    if (base == null || node == null || engine == null) return (sourceId: sourceId, choice: null);
-    return (sourceId: sourceId, choice: LayersChoice(base: base, node: node, engine: engine));
+    if (base == null || node == null || engine == null) {
+      return (sourceId: sourceId, nodeSourceId: nodeSourceId, engineSourceId: engineSourceId, choice: null);
+    }
+    return (
+      sourceId: sourceId,
+      nodeSourceId: nodeSourceId,
+      engineSourceId: engineSourceId,
+      choice: LayersChoice(base: base, node: node, engine: engine),
+    );
   }
 
   /// noruntime first install: download the channel, then unpack.

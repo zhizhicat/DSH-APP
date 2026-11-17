@@ -71,9 +71,17 @@ class RuntimeInstallController extends Notifier<bool> {
       final channels = await runtime.channels();
       final channel = channels.firstWhere((c) => c.id.contains('layers'),
           orElse: () => channels.first);
-      await LocalRuntimeController.saveVariantPrefs(sourceId: sourceId, choice: choice);
+      // v1.5 三层分源：node/engine 的专属源由下载页写入 prefs，这里读回透传。
+      final saved = await LocalRuntimeController.loadVariantPrefs();
+      await LocalRuntimeController.saveVariantPrefs(
+        sourceId: sourceId,
+        choice: choice,
+        nodeSourceId: saved.nodeSourceId,
+        engineSourceId: saved.engineSourceId,
+      );
       await runtime.installLayerChannel(
-        channelId: channel.id, sourceId: sourceId, choice: choice);
+        channelId: channel.id, sourceId: sourceId, choice: choice,
+        nodeSourceId: saved.nodeSourceId, engineSourceId: saved.engineSourceId);
     });
     return run.whenComplete(() {
       if (identical(_pending, run)) _pending = null;
