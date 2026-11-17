@@ -53,13 +53,38 @@ class RuntimeController private constructor(private val app: Context) : DshProce
     private val prefs = app.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
     private val workspaceRecovery = WorkspaceRecoveryMode(prefs.getBoolean(K_WORKSPACE_RECOVERY, false))
 
-    val manifest: RuntimeManifest by lazy { RuntimeManifest.load(app) }
-    @Volatile private var channelInstaller: RuntimeInstaller? = null
+    /** Bundle manifest, or null on noruntime builds (download-on-first-run). */
+    private val bundledManifest: RuntimeManifest? by lazy {
+        runCatching { RuntimeManifest.load(app) }.getOrNull()
+    }
+
+    /** Set once a channel's manifest has been fetched; takes precedence over the bundle. */
     @Volatile private var channelManifest: RuntimeManifest? = null
+
+    /** The last successfully installed channel's manifest, read back from disk on
+     *  a noruntime cold start so the app can tell "already installed" apart from
+     *  "fresh download". */
+    private val persistedManifest: RuntimeManifest? by lazy {
+        if (bundledManifest == null) RuntimeManifest.loadChannel(app) else null
+    }
+
     val manifest: RuntimeManifest
-        get() = channelManifest ?: RuntimeManifest.load(app)
+        get() = channelManifest ?: bundledManifest ?: persistedManifest
+        ?: throw IOException("no runtime manifest: bundle absent, download a runtime channel first")
+
+    private val bundledInstaller: RuntimeInstaller? by lazy {
+        bundledManifest?.let { RuntimeInstaller(app, it, ::note) }
+    }
+
+    private val persistedInstaller: RuntimeInstaller? by lazy {
+        persistedManifest?.let { RuntimeInstaller(app, it, ::note) }
+    }
+
+    @Volatile private var channelInstaller: RuntimeInstaller? = null
+
     private val installer: RuntimeInstaller
-        get() = channelInstaller ?: RuntimeInstaller(app, manifest, ::note)
+        get() = channelInstaller ?: bundledInstaller ?: persistedInstaller
+        ?: throw IOException("runtime unavailable: bundle absent, download a runtime channel first")
     @Volatile private var process: DshProcess? = null
     @Volatile private var lastLaunch: LaunchDiagnostics? = null
     /** The start in progress is turning PRoot's fake hard links into real files (see [L2sMigration]). */
