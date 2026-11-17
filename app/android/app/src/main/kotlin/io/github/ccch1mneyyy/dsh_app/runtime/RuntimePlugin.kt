@@ -24,9 +24,6 @@ import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.PluginRegistry
 import java.io.File
 
-/** Flutter bridge for the local runtime: MethodChannel `dsh/runtime`, EventChannel `dsh/runtime/events`. */
-class RuntimePlugin :
-
 /** JSONObject{layer:[{...}]} -> Map<String, List<Map<String,Any?>>> for the Flutter bridge. */
 private fun jsonToMapList(o: org.json.JSONObject): Map<String, List<Map<String, Any?>>> {
     val out = mutableMapOf<String, List<Map<String, Any?>>>()
@@ -42,6 +39,9 @@ private fun jsonToMapList(o: org.json.JSONObject): Map<String, List<Map<String, 
     }
     return out
 }
+
+/** Flutter bridge for the local runtime: MethodChannel `dsh/runtime`, EventChannel `dsh/runtime/events`. */
+class RuntimePlugin :
     FlutterPlugin,
     ActivityAware,
     MethodChannel.MethodCallHandler,
