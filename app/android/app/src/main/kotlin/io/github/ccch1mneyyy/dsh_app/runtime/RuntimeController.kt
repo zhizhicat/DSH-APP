@@ -292,8 +292,7 @@ class RuntimeController private constructor(private val app: Context) : DshProce
                 val m = RuntimeManifest.fromJson(JSONObject(manifestFile.readText()))
                 synchronized(this) { channelManifest = m }
                 RuntimeManifest.saveChannel(app, m)
-                val inst = RuntimeInstaller(app, m, ::note, source = FileArchiveSource(downloads))
-                    .also { channelInstaller = it }
+
                 log("[dsh-app] channel ${channel.id}: downloading ${m.archives.size} archive(s) " +
                     "(${m.archives.sumOf { it.bytes }.let { b -> if (b > 0) b / (1024 * 1024) else -1 }}MB)", "system")
                 for (archive in m.archivesForInstall(false)) {
@@ -306,6 +305,8 @@ class RuntimeController private constructor(private val app: Context) : DshProce
                         emit(mapOf("type" to "progress", "step" to "download", "done" to done, "total" to total))
                     }
                 }
+                val inst = RuntimeInstaller(app, m, ::note, source = FileArchiveSource(downloads))
+                    .also { channelInstaller = it }
                 log("[dsh-app] unpacking runtime ${m.runtimeVersion} (${m.abi})", "system")
                 val started = System.currentTimeMillis()
                 if (inst.rootfs.exists() && !DshProcess(app, m, inst.rootfs, this).killStrays()) {
@@ -358,12 +359,11 @@ class RuntimeController private constructor(private val app: Context) : DshProce
                 val downloader = RuntimeDownloader(app, ::note) { isCancelledDownloads() }
                 log("[dsh-app] channel ${channel.id} via ${source.id}: fetching layers index", "system")
                 val index = LayerChannels.fetchIndex(channel, source, downloads, downloader)
-                val m = RuntimeManifest.fromJson(
+                var m = RuntimeManifest.fromJson(
                     LayerChannels.buildManifest(index, "arm64-v8a", baseKey, nodeKey, engineKey))
                 synchronized(this) { channelManifest = m }
                 RuntimeManifest.saveChannel(app, m)
-                val inst = RuntimeInstaller(app, m, ::note, source = FileArchiveSource(downloads))
-                    .also { channelInstaller = it }
+
                 // Hot engine upgrade: when the active rootfs already matches the
                 // chosen base and node layers, download only the engine archive.
                 // Installer unpacks and activates the same engine-only set on an
@@ -399,6 +399,37 @@ class RuntimeController private constructor(private val app: Context) : DshProce
                 for (archive in toDownload) {
                     val layer = layerOf(archive.asset)
                     val prefix = layerPrefix[layer] ?: fallback
+                    // node-dist 原生源:官方 tar 直拉(SHASUMS256.txt 校验),
+                    // install 期由 restageOfficialNodeTar 重映射为层布局。
+                    var distLayerSource = if (layer == "node")
+                        LayerSources.find("node", nodeSourceId ?: sourceId) else null
+                    if (distLayerSource?.kind == "node-dist") {
+                        val version = archive.asset.removePrefix("node-v").substringBefore("-")
+                        val officialAsset = "node-v$version-linux-arm64.tar.xz"
+                        val sums = File(downloads, "SHASUMS256.txt")
+                        downloader.download(
+                            LayerSources.nodeDistUrl(distLayerSource, version, "SHASUMS256.txt"),
+                            sums, expectedSha256 = null, expectedBytes = -1L,
+                        ) { _, _ -> }
+                        val sha = LayerSources.shaFromSums(sums, officialAsset)
+                        log("[dsh-app] node layer via ${distLayerSource.id} (node-dist, official tar)", "system")
+                        // manifest 里记的是层包 sha,换成官方 tar sha 让 install() 的 verify 对得上。
+                        m = m.copy(archives = m.archives.map {
+                            if (it.asset == archive.asset) it.copy(
+                                sha256 = sha,
+                                bytes = File(downloads, archive.asset).let { f -> if (f.isFile) f.length() else it.bytes },
+                            ) else it
+                        })
+                        RuntimeManifest.saveChannel(app, m)
+                        synchronized(this) { channelManifest = m }
+                        downloader.download(
+                            LayerSources.nodeDistUrl(distLayerSource, version, officialAsset),
+                            File(downloads, archive.asset), sha,
+                        ) { done, total ->
+                            emit(mapOf("type" to "progress", "step" to "download", "done" to done, "total" to total))
+                        }
+                        continue
+                    }
                     if (prefix != fallback) log("[dsh-app] $layer layer via dedicated source prefix", "system")
                     downloader.download(
                         prefix + channel.githubBase + archive.asset,
@@ -407,6 +438,8 @@ class RuntimeController private constructor(private val app: Context) : DshProce
                         emit(mapOf("type" to "progress", "step" to "download", "done" to done, "total" to total))
                     }
                 }
+                val inst = RuntimeInstaller(app, m, ::note, source = FileArchiveSource(downloads))
+                    .also { channelInstaller = it }
                 log("[dsh-app] unpacking runtime ${m.runtimeVersion} (${m.abi})", "system")
                 val started = System.currentTimeMillis()
                 if (inst.rootfs.exists() && !DshProcess(app, m, inst.rootfs, this).killStrays()) {

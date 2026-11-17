@@ -71,7 +71,7 @@ internal class RuntimeInstaller(
         checkFreeSpace(archives)
         staging.mkdirs()
 
-        val assetLengths = archives.map { assetLength("${RuntimeManifest.ASSET_DIR}/${it.asset}") }
+        val assetLengths = archives.map { source.length("${RuntimeManifest.ASSET_DIR}/${it.asset}") }
         val totals = archives.mapIndexed { i, archive -> assetLengths[i].takeIf { it > 0 } ?: archive.bytes }
         val total = totals.sum()
         onLog("[dsh-app] install assets: ${archives.joinToString { it.asset }} ($total compressed bytes)")
@@ -89,7 +89,7 @@ internal class RuntimeInstaller(
             timed("verify") {
                 // Parallel readers revisit compressed bytes; hash each selected asset once, in order.
                 val digest = MessageDigest.getInstance("SHA-256")
-                DigestInputStream(context.assets.open(assetPath, AssetManager.ACCESS_STREAMING), digest).use { input ->
+                DigestInputStream(source.open(assetPath), digest).use { input ->
                     val buffer = ByteArray(1 shl 16)
                     while (input.read(buffer) >= 0) {}
                 }
@@ -104,14 +104,18 @@ internal class RuntimeInstaller(
                 val extractor = TarExtractor(staging, progress)
                 if (archive.asset.endsWith(".xz") && assetLengths[index] > 0) {
                     val decoded = ParallelXZInputStream.open(
-                        { AssetSeekableInputStream(context.assets.openFd(assetPath)) }, progress,
+                        { source.openSeekable(assetPath) }, progress,
                     )
                     extractor.extractDecoded(decoded)
                 } else {
-                    context.assets.open(assetPath, AssetManager.ACCESS_STREAMING).use { raw ->
+                    source.open(assetPath).use { raw ->
                         extractor.extract(raw, archive.asset)
                     }
                 }
+                // node-dist 原生源:官方 tar 顶层是 node-vX-linux-arm64/ 自包含树,
+                // 重组装为层布局 opt/node/{bin,lib,LICENSE}(与构建侧 rtbuild 同规则,
+                // 软链/npmrc 由 engine 层 overlay 提供,此处无需补)。
+                restageOfficialNodeTar(staging, onLog)
             }
             completed += totals[index]
         }
@@ -160,11 +164,28 @@ internal class RuntimeInstaller(
         retireRuntime(baseDir, retiredDir, keepDir, keep, sync)
     }
 
-    private fun assetLength(path: String): Long = try {
-        context.assets.openFd(path).use { it.length }
-    } catch (_: Exception) {
-        -1L // compressed asset; fall back to the manifest
+}
+
+/**
+ * 官方 node 发行 tar(node-vX.Y.Z-linux-arm64.tar.xz)重组装:解包后若 staging 顶层
+ * 出现 node-v*-linux-*/ 目录,把 bin/lib/LICENSE 挪到 opt/node/ 下,其余(include/
+ * share/docs/头文件)按构建侧 keep 规则丢弃。普通层 tar 无此目录,零开销直通。
+ */
+internal fun restageOfficialNodeTar(staging: File, onLog: (String) -> Unit) {
+    val official = staging.listFiles()?.firstOrNull {
+        it.isDirectory && it.name.startsWith("node-v") && it.name.contains("linux-")
+    } ?: return
+    val keep = setOf("bin", "lib", "LICENSE")
+    val dest = File(staging, "opt/node")
+    dest.mkdirs()
+    official.listFiles()?.forEach { entry ->
+        if (entry.name in keep) {
+            val target = File(dest, entry.name)
+            if (!target.exists()) entry.renameTo(target)
+        }
     }
+    official.deleteRecursively()
+    onLog("[dsh-app] node-dist restaged: $official -> opt/node (kept ${keep.joinToString(",")})")
 }
 
 internal fun requiredRuntimeInstallSpace(archives: List<RuntimeArchive>): Long {

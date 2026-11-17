@@ -39,18 +39,18 @@ internal object LayerSources {
     /** rootfs：gh 四镜像（B 波再追加 TUNA-LXC / 官方 LXC） */
     val base: List<LayerSource> = ghMirrors
 
-    /** node：gh 四镜像 + 五个 node-dist 原生源（experimental，B 波放开） */
+    /** node：gh 四镜像 + 五个 node-dist 原生源（官方 tar 直拉，装机期重映射层布局） */
     val node: List<LayerSource> = ghMirrors + listOf(
-        LayerSource("npmmirror", "npmmirror · 阿里", "node-dist",
-            distBase = "https://npmmirror.com/mirrors/node", probePath = "SHASUMS256.txt", experimental = true),
+        LayerSource("aliyun", "阿里云", "node-dist",
+            distBase = "https://mirrors.aliyun.com/nodejs-release", probePath = "SHASUMS256.txt"),
         LayerSource("tencent", "腾讯云", "node-dist",
-            distBase = "https://mirrors.cloud.tencent.com/nodejs-release", probePath = "SHASUMS256.txt", experimental = true),
+            distBase = "https://mirrors.cloud.tencent.com/nodejs-release", probePath = "SHASUMS256.txt"),
         LayerSource("huawei", "华为云", "node-dist",
-            distBase = "https://mirrors.huaweicloud.com/nodejs", probePath = "SHASUMS256.txt", experimental = true),
+            distBase = "https://mirrors.huaweicloud.com/nodejs", probePath = "SHASUMS256.txt"),
         LayerSource("tuna", "清华 TUNA", "node-dist",
-            distBase = "https://mirrors.tuna.tsinghua.edu.cn/nodejs-release", probePath = "SHASUMS256.txt", experimental = true),
+            distBase = "https://mirrors.tuna.tsinghua.edu.cn/nodejs-release", probePath = "SHASUMS256.txt"),
         LayerSource("nodejs", "nodejs.org 官方", "node-dist",
-            distBase = "https://nodejs.org/dist", probePath = "SHASUMS256.txt", experimental = true),
+            distBase = "https://nodejs.org/dist", probePath = "SHASUMS256.txt"),
     )
 
     /** engine：gh 四镜像（B 波追加 npm 四源装机期组装） */
