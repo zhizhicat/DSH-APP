@@ -168,8 +168,8 @@ internal class RuntimeInstaller(
 
 /**
  * 官方 node 发行 tar(node-vX.Y.Z-linux-arm64.tar.xz)重组装:解包后若 staging 顶层
- * 出现 node-v*-linux-*/ 目录,把 bin/lib/LICENSE 挪到 opt/node/ 下,其余(include/
- * share/docs/头文件)按构建侧 keep 规则丢弃。普通层 tar 无此目录,零开销直通。
+ * 出现 node-vX.Y.Z-linux-arm64 目录,把 bin、lib、LICENSE 挪到 opt/node 下,其余
+ * (include、share、docs、头文件)按构建侧 keep 规则丢弃。普通层 tar 无此目录,直通。
  */
 internal fun restageOfficialNodeTar(staging: File, onLog: (String) -> Unit) {
     val official = staging.listFiles()?.firstOrNull {

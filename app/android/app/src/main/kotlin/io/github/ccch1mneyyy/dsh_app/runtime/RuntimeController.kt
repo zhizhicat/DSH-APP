@@ -369,7 +369,7 @@ class RuntimeController private constructor(private val app: Context) : DshProce
                 // Installer unpacks and activates the same engine-only set on an
                 // existing rootfs, so the download list must match that judgment.
                 val installedInfo = runCatching {
-                    JSONObject(File(inst.rootfs, "etc/dsh-app/runtime.json").readText())
+                    JSONObject(File(app.filesDir, "runtime/rootfs/etc/dsh-app/runtime.json").readText())
                 }.getOrNull()
                 val hot = installedInfo != null && runCatching {
                     installedInfo.getJSONObject("upgrade").getString("baseId") ==
