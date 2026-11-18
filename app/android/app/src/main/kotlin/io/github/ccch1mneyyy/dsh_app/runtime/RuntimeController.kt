@@ -305,8 +305,7 @@ class RuntimeController private constructor(private val app: Context) : DshProce
                         emit(mapOf("type" to "progress", "step" to "download", "done" to done, "total" to total))
                     }
                 }
-                val inst = RuntimeInstaller(app, m, ::note, source = FileArchiveSource(downloads),
-                    assembledEngine = assembledEngine)
+                val inst = RuntimeInstaller(app, m, ::note, source = FileArchiveSource(downloads))
                     .also { channelInstaller = it }
                 log("[dsh-app] unpacking runtime ${m.runtimeVersion} (${m.abi})", "system")
                 val started = System.currentTimeMillis()
@@ -506,8 +505,7 @@ class RuntimeController private constructor(private val app: Context) : DshProce
                         emit(mapOf("type" to "progress", "step" to "download", "done" to done, "total" to total))
                     }
                 }
-                val inst = RuntimeInstaller(app, m, ::note, source = FileArchiveSource(downloads),
-                    assembledEngine = assembledEngine)
+                val inst = RuntimeInstaller(app, m, ::note, source = FileArchiveSource(downloads))
                     .also { channelInstaller = it }
                 log("[dsh-app] unpacking runtime ${m.runtimeVersion} (${m.abi})", "system")
                 val started = System.currentTimeMillis()
