@@ -105,6 +105,12 @@ def main():
         import glob, os
         for bf in sorted(glob.glob(os.path.join(args.compose_dir, "base-*.json"))):
             if "debs" in os.path.basename(bf):
+                # deb+python 增量包描述并入同变体（App 端 ubuntu-base 组装要校验它）
+                debdoc = json.load(open(bf))
+                dvar = os.path.basename(bf)[len("base-debs-"):-len(".json")]
+                compose.setdefault("baseVariants", {}).setdefault(dvar, {})["debs"] = {
+                    "asset": debdoc.get("asset"), "sha256": debdoc.get("sha256"),
+                    "bytes": debdoc.get("bytes")}
                 continue
             doc = json.load(open(bf))
             variant = os.path.basename(bf)[len("base-"):-len(".json")]
