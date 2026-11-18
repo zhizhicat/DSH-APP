@@ -31,9 +31,19 @@ for group, entries in fresh.get("layers", {}).items():
 
 published["layers"] = merged_layers
 published["notes"] = fresh.get("notes", published.get("notes"))
-# compose 块（装机期组装清单）跟 fresh 走：fresh 带 compose 就是新权威，
-# 不带（旧构建重跑）则保留 published 的，避免组装能力被无谓回退。
+# compose 块（装机期组装清单）按子键深合并：fresh 的条目赢，published-only
+# 的条目存活。整块赋值会像 layers 那样丢变体——pure.yml 只建 debian-12，
+# 一跑就把 run#3 发布的 ubuntu/debian-13 组装条目全抹了（2026-11-19 真机
+# "compose has no base variant ubuntu-24.04.5-arm64-v8a" 事故根因）。
 if "compose" in fresh:
-    published["compose"] = fresh["compose"]
+    pub_c = published.get("compose")
+    if not isinstance(pub_c, dict):
+        published["compose"] = fresh["compose"]
+    else:
+        for k, v in fresh["compose"].items():
+            if isinstance(v, dict) and isinstance(pub_c.get(k), dict):
+                pub_c[k].update(v)  # baseVariants 等按变体键合并
+            else:
+                pub_c[k] = v
 json.dump(published, sys.stdout, indent=2, sort_keys=True)
 sys.stdout.write("\n")
