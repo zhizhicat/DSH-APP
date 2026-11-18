@@ -51,7 +51,11 @@ jobs:
 
       - name: Export toolchain env
         run: |
-          bash tooling/setup-toolchain.sh >/dev/null 2>&1 || true
+          # runner stall 防御（同 build-apk.sh 的 1500s 纪律）:setup-toolchain 裸奔
+          # 无限时,挂死会吃满 job 级 90min timeout（2026-11-19 run 44396244292 实锤）。
+          # 下载缓存命中时此步秒过,1500s 限时只在真卡死时兜底。
+          timeout -k 30 1500 bash tooling/setup-toolchain.sh >/dev/null 2>&1 || true
+          test -f tooling/env.sh || { echo "::error::setup-toolchain produced no env.sh"; exit 1; }
           JAVA_HOME=$(grep -o 'JAVA_HOME="[^"]*"' tooling/env.sh | cut -d'"' -f2)
           SDK=$(grep -o 'ANDROID_HOME="[^"]*"' tooling/env.sh | cut -d'"' -f2)
           echo "JAVA_HOME=$JAVA_HOME" >> "$GITHUB_ENV"
