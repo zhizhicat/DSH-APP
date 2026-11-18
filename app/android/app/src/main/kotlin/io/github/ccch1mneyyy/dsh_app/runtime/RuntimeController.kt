@@ -403,7 +403,7 @@ class RuntimeController private constructor(private val app: Context) : DshProce
                     // ubuntu-base 原生源:镜像站直拉 rootfs(SHA256SUMS 校验) + deb 增量包,
                     // 装机期由 dpkgBootstrap 在 rootfs 就位后自举 deb 闭包。
                     val baseDist = if (layer == "base")
-                        LayerSources.find("base", baseSourceId) else null
+                        LayerSources.find("base", sourceId) else null
                     if (baseDist?.kind == "ubuntu-base") {
                         val idxObj = JSONObject(File(downloads, "layers-index.json").readText())
                         val compose = idxObj.optJSONObject("compose")
