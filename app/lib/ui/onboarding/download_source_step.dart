@@ -525,7 +525,7 @@ class _SourceChip extends StatelessWidget {
             color: selected ? theme.colorScheme.primary : theme.dividerColor,
             width: selected ? 1.6 : 1,
           ),
-          color: selected ? theme.colorScheme.primary.withOpacity(0.08) : null,
+          color: selected ? theme.colorScheme.primary.withValues(alpha: 0.08) : null,
         ),
         child: Row(mainAxisSize: MainAxisSize.min, children: [
           Text(source.name, style: theme.textTheme.labelMedium),

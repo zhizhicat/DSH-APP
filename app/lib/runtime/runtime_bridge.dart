@@ -669,7 +669,7 @@ class RuntimeBridge {
       'channelId': channelId,
       'layer': layer,
       'sourceId': sourceId,
-      if (nodeVersion != null) 'nodeVersion': nodeVersion,
+      'nodeVersion': ?nodeVersion,
     });
     return (raw! as Map).cast<Object?, Object?>();
   }
@@ -697,8 +697,8 @@ class RuntimeBridge {
         'base': base,
         'node': node,
         'engine': engine,
-        if (nodeSourceId != null) 'nodeSourceId': nodeSourceId,
-        if (engineSourceId != null) 'engineSourceId': engineSourceId,
+        'nodeSourceId': ?nodeSourceId,
+        'engineSourceId': ?engineSourceId,
       });
 
   /// [phoneStorage] mounts the phone's shared storage at /sdcard (needs [requestStorage] first).

@@ -62,7 +62,7 @@ void main() {
     for (final f in [reprobe, start]) {
       final ro = tester.firstRenderObject<RenderBox>(f);
       final top = ro.localToGlobal(Offset.zero).dy;
-      debugPrint('${f.description} top=$top screenH=${screen.height}');
+      debugPrint('button top=$top screenH=${screen.height}');
       expect(top < screen.height, isTrue, reason: '按钮 top 超出屏幕');
     }
   });
