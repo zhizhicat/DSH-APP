@@ -410,7 +410,7 @@ class RuntimeController private constructor(private val app: Context) : DshProce
                             ?: throw IOException("layers index carries no compose block; re-release layers first")
                         val bv = compose.optJSONObject("baseVariants")
                             ?.optJSONObject("$baseKey-arm64-v8a") // 形如 ubuntu-24.04.5-arm64-v8a
-                            ?: throw IOException("compose has no base variant $baseKey-$abi")
+                            ?: throw IOException("compose has no base variant $baseKey-arm64-v8a")
                         val rootfs = bv.optJSONObject("rootfs")
                             ?: throw IOException("compose base variant missing rootfs")
                         val sha = rootfs.getString("sha256")
