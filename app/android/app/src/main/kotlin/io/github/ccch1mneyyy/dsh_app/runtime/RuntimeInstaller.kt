@@ -34,6 +34,7 @@ internal class RuntimeInstaller(
     private val onLog: (String) -> Unit,
     private val sync: () -> Unit = ::syncFilesystems,
     private val source: ArchiveSource = AssetArchiveSource(context),
+    private val assembledEngine: File? = null,
 ) {
     val baseDir = File(context.filesDir, "runtime")
     val rootfs = File(baseDir, "rootfs")
@@ -77,7 +78,7 @@ internal class RuntimeInstaller(
         onLog("[dsh-app] install assets: ${archives.joinToString { it.asset }} ($total compressed bytes)")
         var completed = 0L
         var lastReported = 0L
-        for ((index, archive) in archives.withIndex()) {
+        layerLoop@ for ((index, archive) in archives.withIndex()) {
             val assetPath = "${RuntimeManifest.ASSET_DIR}/${archive.asset}"
             val progress: (Long) -> Unit = { read ->
                 val aggregate = completed + read
@@ -85,6 +86,22 @@ internal class RuntimeInstaller(
                     lastReported = aggregate
                     onProgress(aggregate, total)
                 }
+            }
+            if (archive.asset == EngineCompose.MARKER) {
+                // 组装模式:材料已拼好,直接把目录内容并进 staging,跳过 verify/extract。
+                val src = assembledEngine
+                    ?: throw IllegalStateException("engine compose marker without assembled tree")
+                timed("merge-compose") {
+                    src.walkTopDown().forEach { f ->
+                        val rel = f.relativeTo(src).path
+                        if (rel.isEmpty()) return@forEach
+                        val target = File(staging, rel)
+                        if (f.isDirectory) target.mkdirs() else f.renameTo(target)
+                    }
+                    src.deleteRecursively()
+                }
+                completed += totals[index]
+                continue@layerLoop
             }
             timed("verify") {
                 // Parallel readers revisit compressed bytes; hash each selected asset once, in order.

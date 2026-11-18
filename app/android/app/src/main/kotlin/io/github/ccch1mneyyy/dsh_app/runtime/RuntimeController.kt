@@ -305,7 +305,8 @@ class RuntimeController private constructor(private val app: Context) : DshProce
                         emit(mapOf("type" to "progress", "step" to "download", "done" to done, "total" to total))
                     }
                 }
-                val inst = RuntimeInstaller(app, m, ::note, source = FileArchiveSource(downloads))
+                val inst = RuntimeInstaller(app, m, ::note, source = FileArchiveSource(downloads),
+                    assembledEngine = assembledEngine)
                     .also { channelInstaller = it }
                 log("[dsh-app] unpacking runtime ${m.runtimeVersion} (${m.abi})", "system")
                 val started = System.currentTimeMillis()
@@ -397,6 +398,7 @@ class RuntimeController private constructor(private val app: Context) : DshProce
                     else -> "base"
                 }
                 var baseDistBootstrapped: File? = null
+                var assembledEngine: File? = null
                 for (archive in toDownload) {
                     val layer = layerOf(archive.asset)
                     val prefix = layerPrefix[layer] ?: fallback
@@ -470,6 +472,32 @@ class RuntimeController private constructor(private val app: Context) : DshProce
                         }
                         continue
                     }
+                    // npm-registry 原生源:registry 直拉 743 包闭包+pnpm+adapter/overlay 现场组装。
+                    val npmSrc = if (layer == "engine")
+                        LayerSources.find("engine", engineSourceId ?: sourceId) else null
+                    if (npmSrc?.kind == "npm-registry") {
+                        val compose = JSONObject(File(downloads, "layers-index.json").readText())
+                            .optJSONObject("compose")
+                            ?: throw IOException("layers index carries no compose block; re-release layers first")
+                        val eng = compose.optJSONObject("engine")
+                            ?: throw IOException("compose has no engine block")
+                        log("[dsh-app] engine layer via ${npmSrc.id} (npm compose, experimental)", "system")
+                        emit(mapOf("type" to "progress", "step" to "download", "done" to 0, "total" to 1))
+                        val assembled = EngineCompose.assemble(
+                            app, eng, npmSrc.distBase, fallback, downloads,
+                            nodeKey, baseKey, downloader,
+                            { d, t -> emit(mapOf("type" to "progress", "step" to "download", "done" to d.toLong(), "total" to t.toLong())) },
+                            ::note,
+                        )
+                        assembledEngine = assembled
+                        m = m.copy(archives = m.archives.map {
+                            if (it.asset == archive.asset) it.copy(
+                                asset = EngineCompose.MARKER, sha256 = null, bytes = 0L) else it
+                        })
+                        RuntimeManifest.saveChannel(app, m)
+                        synchronized(this) { channelManifest = m }
+                        continue
+                    }
                     if (prefix != fallback) log("[dsh-app] $layer layer via dedicated source prefix", "system")
                     downloader.download(
                         prefix + channel.githubBase + archive.asset,
@@ -478,7 +506,8 @@ class RuntimeController private constructor(private val app: Context) : DshProce
                         emit(mapOf("type" to "progress", "step" to "download", "done" to done, "total" to total))
                     }
                 }
-                val inst = RuntimeInstaller(app, m, ::note, source = FileArchiveSource(downloads))
+                val inst = RuntimeInstaller(app, m, ::note, source = FileArchiveSource(downloads),
+                    assembledEngine = assembledEngine)
                     .also { channelInstaller = it }
                 log("[dsh-app] unpacking runtime ${m.runtimeVersion} (${m.abi})", "system")
                 val started = System.currentTimeMillis()

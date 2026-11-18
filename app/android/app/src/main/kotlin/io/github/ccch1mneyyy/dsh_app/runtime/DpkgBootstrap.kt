@@ -30,6 +30,27 @@ internal object DpkgBootstrap {
 
         val debs = stage.walkTopDown().filter { it.isFile && it.name.endsWith(".deb") }.toList()
         if (debs.isEmpty()) throw IOException("deb delta contains no .deb files")
+
+        // python-build-standalone tar(增量包里的非 deb tarball):strip python/ 前缀装到 opt/python,
+        // 与构建侧同布局;软链由 engine overlay 提供,此处只摆二进制树 + pip 源配置。
+        val pythonTar = stage.walkTopDown().filter {
+            it.isFile && !it.name.endsWith(".deb") && (it.name.endsWith(".tar.gz") || it.name.endsWith(".tgz"))
+        }.firstOrNull()
+        if (pythonTar != null) {
+            onLog("[dsh-app] dpkg bootstrap: python bundle ${pythonTar.name}")
+            val pyStage = File(context.cacheDir, "python-stage")
+            pyStage.deleteRecursively(); pyStage.mkdirs()
+            TarExtractor(pyStage) { }.extract(pythonTar.inputStream(), pythonTar.name)
+            val src = File(pyStage, "python")
+            if (src.isDirectory) {
+                val dest = File(rootfs, "opt/python")
+                dest.deleteRecursively()
+                src.copyRecursively(dest, overwrite = true)
+            }
+            pyStage.deleteRecursively()
+            File(rootfs, "etc/pip.conf").writeText(
+                "[global]\nindex-url = https://pypi.tuna.tsinghua.edu.cn/simple\ndisable-pip-version-check = true\n")
+        }
         onLog("[dsh-app] dpkg bootstrap: ${debs.size} debs, installing via proot")
 
         val argv = mutableListOf(

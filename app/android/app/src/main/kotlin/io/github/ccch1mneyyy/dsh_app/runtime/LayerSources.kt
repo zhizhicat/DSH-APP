@@ -58,8 +58,17 @@ internal object LayerSources {
             distBase = "https://nodejs.org/dist", probePath = "SHASUMS256.txt"),
     )
 
-    /** engine：gh 四镜像（B 波追加 npm 四源装机期组装） */
-    val engine: List<LayerSource> = ghMirrors
+    /** engine：gh 四镜像 + npm registry 组装源（拉 743 包+pnpm+adapter+overlay 现场拼装,实验:无构建期补丁） */
+    val engine: List<LayerSource> = ghMirrors + listOf(
+        LayerSource("npmmirror", "npmmirror · 阿里（实验）", "npm-registry",
+            distBase = "https://registry.npmmirror.com", probePath = ""),
+        LayerSource("huawei-npm", "华为云 npm（实验）", "npm-registry",
+            distBase = "https://repo.huaweicloud.com/repository/npm", probePath = ""),
+        LayerSource("tencent-npm", "腾讯云 npm（实验）", "npm-registry",
+            distBase = "https://mirrors.cloud.tencent.com/npm", probePath = ""),
+        LayerSource("npmjs", "npmjs.org 官方（实验）", "npm-registry",
+            distBase = "https://registry.npmjs.org", probePath = ""),
+    )
 
     fun forLayer(layer: String): List<LayerSource> = when (layer) {
         "base" -> base

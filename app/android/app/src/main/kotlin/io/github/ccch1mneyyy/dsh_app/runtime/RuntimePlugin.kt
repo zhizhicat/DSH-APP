@@ -186,6 +186,7 @@ class RuntimePlugin :
                             src.kind == "node-dist" && nodeVersion != null ->
                                 LayerSources.nodeProbeUrl(src, nodeVersion.removePrefix("node-v"))
                             src.kind == "ubuntu-base" -> src.distBase // 镜像站根,装什么探什么
+                            src.kind == "npm-registry" -> src.distBase // registry 根,装机期组装
                             else -> src.prefix + channel.githubBase + channel.indexPath
                         }
                         result.success(LayerChannels.probe(url))
