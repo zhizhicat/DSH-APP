@@ -492,14 +492,21 @@ class RuntimeController private constructor(private val app: Context) : DshProce
                         val eng = compose.optJSONObject("engine")
                             ?: throw IOException("compose has no engine block")
                         log("[dsh-app] engine layer via ${npmSrc.id} (npm compose, experimental)", "system")
-                        emit(mapOf("type" to "progress", "step" to "download", "done" to 0, "total" to 1))
+                        // npm 组装的进度单位是「包数」(743+),与 doneSoFar 的字节
+                        // 不可加——直接相加会出现 0% 卡死(首包未完成)或瞬间
+                        // 99%(字节基数远大于包数)。按引擎层已知 bytes 折算成
+                        // 字节进度,与其它层保持同一单位。
+                        val engBytes = archive.bytes.takeIf { it > 0 } ?: 1L
                         val assembled = EngineCompose.assemble(
                             app, eng, npmSrc.distBase, fallback, downloads,
                             nodeKey, baseKey, downloader,
-                            { d, t -> emitDownload(d.toLong(), t.toLong()) },
-
+                            { d, t ->
+                                val frac = if (t > 0) d.toDouble() / t else 0.0
+                                emitDownload((engBytes * frac).toLong(), engBytes)
+                            },
                             ::note,
                         )
+                        doneSoFar += engBytes
                         assembledEngine = assembled
                         m = m.copy(archives = m.archives.map {
                             if (it.asset == archive.asset) it.copy(
