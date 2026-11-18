@@ -59,7 +59,7 @@ internal object DpkgBootstrap {
             proc.destroy()
             throw IOException("dpkg bootstrap timed out after 10min")
         }
-        val tail = out.toString().lineSequence().takeLast(12).joinToString("\n")
+        val tail = out.toString().lines().takeLast(12).joinToString("\n")
         if (proc.exitValue() != 0) {
             throw IOException("dpkg bootstrap failed (exit ${proc.exitValue()}):\n$tail")
         }
