@@ -31,5 +31,9 @@ for group, entries in fresh.get("layers", {}).items():
 
 published["layers"] = merged_layers
 published["notes"] = fresh.get("notes", published.get("notes"))
+# compose 块（装机期组装清单）跟 fresh 走：fresh 带 compose 就是新权威，
+# 不带（旧构建重跑）则保留 published 的，避免组装能力被无谓回退。
+if "compose" in fresh:
+    published["compose"] = fresh["compose"]
 json.dump(published, sys.stdout, indent=2, sort_keys=True)
 sys.stdout.write("\n")
