@@ -38,7 +38,11 @@ jobs:
       # 原本缓存整个 $HOME/dev 工具链；2026-11-13 GitHub 缓存服务故障连卡 6 个 run，
       # 改为无缓存直装（setup-toolchain.sh 幂等，慢几分钟但不受缓存服务影响）。
       - name: Install toolchain (JDK 17 / Android SDK+NDK; Flutter via flutter-action)
-        run: bash tooling/setup-toolchain.sh
+        run: |
+          # runner stall 防御:与 Export toolchain env / build-apk.sh 同一 1500s 纪律
+          # （11-19 run 44396244292 与 44396897354 两连卡实锤——stall 跟 runner 走,
+          #  cancel 重掷不保证换机,只能限时兜底）。真卡死时 rc=124,靠 job 重试。
+          timeout -k 30 1500 bash tooling/setup-toolchain.sh
         env:
           TOOLCHAIN_MINIMAL: "1"
 
