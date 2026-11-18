@@ -397,9 +397,8 @@ class RuntimeController private constructor(private val app: Context) : DshProce
                     else -> "base"
                 }
                 var baseDistBootstrapped: File? = null
-                var assembledEngine: File? = null
-                // 直拉组装模式下进度必须跨文件累计：每个小文件(deb/node tar/npm
-                // 包)各自回调 done/total,不累计的话 UI 会显示"2/2MB → 4/4MB"
+                // 直拉组装模式下进度必须跨文件累计：每个小文件(deb/node tar)
+                // 各自回调 done/total,不累计的话 UI 会显示"2/2MB → 4/4MB"
                 // 跳变(当前文件而非总量)。doneSoFar 在每个文件完成后累加。
                 var doneSoFar = 0L
                 fun emitDownload(done: Long, total: Long) = emit(mapOf(
@@ -480,40 +479,6 @@ class RuntimeController private constructor(private val app: Context) : DshProce
                             emitDownload(done, total)
                         }
                         doneSoFar += File(downloads, archive.asset).length()
-                        continue
-                    }
-                    // npm-registry 原生源:registry 直拉 743 包闭包+pnpm+adapter/overlay 现场组装。
-                    val npmSrc = if (layer == "engine")
-                        LayerSources.find("engine", engineSourceId ?: sourceId) else null
-                    if (npmSrc?.kind == "npm-registry") {
-                        val compose = JSONObject(File(downloads, "layers-index.json").readText())
-                            .optJSONObject("compose")
-                            ?: throw IOException("layers index carries no compose block; re-release layers first")
-                        val eng = compose.optJSONObject("engine")
-                            ?: throw IOException("compose has no engine block")
-                        log("[dsh-app] engine layer via ${npmSrc.id} (npm compose, experimental)", "system")
-                        // npm 组装的进度单位是「包数」(743+),与 doneSoFar 的字节
-                        // 不可加——直接相加会出现 0% 卡死(首包未完成)或瞬间
-                        // 99%(字节基数远大于包数)。按引擎层已知 bytes 折算成
-                        // 字节进度,与其它层保持同一单位。
-                        val engBytes = archive.bytes.takeIf { it > 0 } ?: 1L
-                        val assembled = EngineCompose.assemble(
-                            app, eng, npmSrc.distBase, fallback, downloads,
-                            nodeKey, baseKey, downloader,
-                            { d, t ->
-                                val frac = if (t > 0) d.toDouble() / t else 0.0
-                                emitDownload((engBytes * frac).toLong(), engBytes)
-                            },
-                            ::note,
-                        )
-                        doneSoFar += engBytes
-                        assembledEngine = assembled
-                        m = m.copy(archives = m.archives.map {
-                            if (it.asset == archive.asset) it.copy(
-                                asset = EngineCompose.MARKER, sha256 = null, bytes = 0L) else it
-                        })
-                        RuntimeManifest.saveChannel(app, m)
-                        synchronized(this) { channelManifest = m }
                         continue
                     }
                     if (prefix != fallback) log("[dsh-app] $layer layer via dedicated source prefix", "system")

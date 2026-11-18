@@ -28,10 +28,5 @@
   "setupSourceRootfs": "Base system",
   "setupSourceNode": "Node.js",
   "setupSourceDsh": "DSH",
-  "setupSourcePureBadge": "Pure",
-  "setupSourcePatchedBadge": "Adapted",
-  "setupPureTitle": "Install the pure DSH build?",
-  "setupPureBody": "This engine version comes straight from the npm upstream without our adaptations: Android environment fixes (encoding, hard links…), the phone control channel, and security/data fixes are absent. It mostly works, some capabilities are missing, and you can switch back to an adapted version anytime.",
-  "setupPureConfirm": "Continue",
-  "setupPureCancel": "Switch back"
+  "setupSourcePatchedBadge": "Adapted"
 }

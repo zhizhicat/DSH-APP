@@ -641,22 +641,18 @@ PYEOF
   fi
 
   # -- DSH --
+  # 纯净版双轨已于 2026-11-19 下线（拍板：不做碎片化下载，154 补丁照打）——
+  # DSH_PURE 通道移除，构建恒走补丁链；上游跟随靠适配层重发。
   local dsh_tag="$DSH_VERSION"
-  [[ "${DSH_PURE:-0}" == "1" ]] && dsh_tag="${DSH_VERSION}-pure"
   local prefix="$work/dsh-prefix"
   if [[ ! -f "$work/.dsh-installed" ]]; then
     install_dsh "$npm_cpu" "$prefix" && touch "$work/.dsh-installed"
   else
     log "dsh prefix cached at $prefix"
   fi
-  if [[ "${DSH_PURE:-0}" == "1" ]]; then
-    log "PURE build: skipping DSH patches (unvetted upstream version allowed)"
-    printf '[]\n' > "$work/dsh-patches.json"
-  else
-    log "patching DSH (runtime/patches, pinned for $DSH_VERSION)"
-    "${PY[@]}" patch-dsh --target android --prefix "$prefix" --dsh-version "$DSH_VERSION" --patches "$HERE/patches" \
-      --out "$work/dsh-patches.json" >&2
-  fi
+  log "patching DSH (runtime/patches, pinned for $DSH_VERSION)"
+  "${PY[@]}" patch-dsh --target android --prefix "$prefix" --dsh-version "$DSH_VERSION" --patches "$HERE/patches" \
+    --out "$work/dsh-patches.json" >&2
   local bridge="$HERE/bridge/dsh-go-bridge"
   local bridge_version
   bridge_version="$(python3 -I -c 'import json,sys; print(json.load(open(sys.argv[1]))["version"])' "$bridge/package.json")"
@@ -676,11 +672,7 @@ PYEOF
       sha256 "$base"; sha256 "$node"; sha256 "$python"; sha256sum "${extra_debs[@]}" | cut -d' ' -f1
       sha256 "$proot_deb"; sha256 "$talloc_deb"; sha256 "$shmem_deb"
       sha256 "$lockfile"; sha256 "$pnpm_lockfile"; sha256 "$HERE/build-runtime.sh"; sha256 "$HERE/lib/rtbuild.py"
-      if [[ "${DSH_PURE:-0}" == "1" ]]; then
-        (cd "$HERE" && find bridge boot direct session-deletion -type f -print0 | LC_ALL=C sort -z | xargs -0 sha256sum)
-      else
-        (cd "$HERE" && find patches bridge boot direct session-deletion -type f -print0 | LC_ALL=C sort -z | xargs -0 sha256sum)
-      fi
+      (cd "$HERE" && find patches bridge boot direct session-deletion -type f -print0 | LC_ALL=C sort -z | xargs -0 sha256sum)
     } | sha256sum | cut -c1-12 )"
   local runtime_version="${RUNTIME_REVISION}-dsh${dsh_tag}-node${NODE_VERSION}-base${BASE}-${inputs_sha}"
   local runtime_info

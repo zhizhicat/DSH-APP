@@ -34,7 +34,6 @@ internal class RuntimeInstaller(
     private val onLog: (String) -> Unit,
     private val sync: () -> Unit = ::syncFilesystems,
     private val source: ArchiveSource = AssetArchiveSource(context),
-    private val assembledEngine: File? = null,
 ) {
     val baseDir = File(context.filesDir, "runtime")
     val rootfs = File(baseDir, "rootfs")
@@ -86,26 +85,6 @@ internal class RuntimeInstaller(
                     lastReported = aggregate
                     onProgress(aggregate, total)
                 }
-            }
-            if (archive.asset == EngineCompose.MARKER) {
-                // 组装模式:材料已拼好,直接把目录内容并进 staging,跳过 verify/extract。
-                val src = assembledEngine
-                    ?: throw IllegalStateException("engine compose marker without assembled tree")
-                timed("merge-compose") {
-                    src.walkTopDown().forEach { f ->
-                        val rel = f.relativeTo(src).path
-                        if (rel.isEmpty()) return@forEach
-                        val target = File(staging, rel)
-                        if (f.isDirectory) target.mkdirs() else {
-                            // renameTo 跨文件系统(如 cache→files 分区)会失败且返回
-                            // false——不检查就静默丢文件,引擎残缺。失败回落 copyTo。
-                            if (!f.renameTo(target)) f.copyTo(target, overwrite = true)
-                        }
-                    }
-                    src.deleteRecursively()
-                }
-                completed += totals[index]
-                continue@layerLoop
             }
             timed("verify") {
                 // Parallel readers revisit compressed bytes; hash each selected asset once, in order.

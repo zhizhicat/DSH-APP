@@ -12,7 +12,6 @@ import java.io.IOException
  * - node-dist  node 层原生源：官方 tar 直拉（实验：需 B 波装机期组装管线——
  *              官方 tar 布局是 node-vX-linux-arm64/ 自包含树，与层 tar 的
  *              opt/node 布局不同构，不能直接解包；启用前须 App 端布局重映射）
- * - npm-registry（B 波）engine 层原生源：装机期按 compose 块 npm 组装
  * - lxc        （B 波）base 层原生源：TUNA/官方 LXC rootfs + 装机期 deb 装配
  *
  * A 波（v3r10）三层都先亮 gh 四镜像；experimental 源不进 UI。
@@ -22,7 +21,7 @@ internal object LayerSources {
     data class LayerSource(
         val id: String,
         val name: String,
-        val kind: String,            // gh-mirror | node-dist | npm-registry | lxc
+        val kind: String,            // gh-mirror | node-dist | lxc
         val prefix: String = "",     // gh-mirror: URL 前缀
         val distBase: String = "",   // node-dist: e.g. https://npmmirror.com/mirrors/node
         val probePath: String = "",  // node-dist 探测相对路径（版本前）
@@ -58,17 +57,10 @@ internal object LayerSources {
             distBase = "https://nodejs.org/dist", probePath = "SHASUMS256.txt"),
     )
 
-    /** engine：gh 四镜像 + npm registry 组装源（拉 743 包+pnpm+adapter+overlay 现场拼装,实验:无构建期补丁） */
-    val engine: List<LayerSource> = ghMirrors + listOf(
-        LayerSource("npmmirror", "npmmirror · 阿里（实验）", "npm-registry",
-            distBase = "https://registry.npmmirror.com", probePath = ""),
-        LayerSource("huawei-npm", "华为云 npm（实验）", "npm-registry",
-            distBase = "https://repo.huaweicloud.com/repository/npm", probePath = ""),
-        LayerSource("tencent-npm", "腾讯云 npm（实验）", "npm-registry",
-            distBase = "https://mirrors.cloud.tencent.com/npm", probePath = ""),
-        LayerSource("npmjs", "npmjs.org 官方（实验）", "npm-registry",
-            distBase = "https://registry.npmjs.org", probePath = ""),
-    )
+    /** engine：gh 四镜像。适配层大包（含 154 补丁的构建产物）只在我们 release 上有，
+     *  npm-registry 装机期组装通道已撤（2026-11-19 拍板：不做碎片化下载，纯净版下线），
+     *  上游跟随走「适配层重发」而不是装机期拼装。 */
+    val engine: List<LayerSource> = ghMirrors
 
     fun forLayer(layer: String): List<LayerSource> = when (layer) {
         "base" -> base

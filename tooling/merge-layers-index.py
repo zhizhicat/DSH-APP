@@ -32,9 +32,11 @@ for group, entries in fresh.get("layers", {}).items():
 published["layers"] = merged_layers
 published["notes"] = fresh.get("notes", published.get("notes"))
 # compose 块（装机期组装清单）按子键深合并：fresh 的条目赢，published-only
-# 的条目存活。整块赋值会像 layers 那样丢变体——pure.yml 只建 debian-12，
+# 的条目存活。整块赋值会像 layers 那样丢变体——曾有个 workflow 只建 debian-12，
 # 一跑就把 run#3 发布的 ubuntu/debian-13 组装条目全抹了（2026-11-19 真机
 # "compose has no base variant ubuntu-24.04.5-arm64-v8a" 事故根因）。
+# 注：2026-11-19 装机期 npm 组装通道已撤（纯净版下线），此合并逻辑保留
+# 供 base/node 的 compose（deb/官方 tar 直拉清单）继续使用。
 if "compose" in fresh:
     pub_c = published.get("compose")
     if not isinstance(pub_c, dict):
