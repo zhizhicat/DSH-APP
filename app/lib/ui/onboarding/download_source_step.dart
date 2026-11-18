@@ -330,6 +330,12 @@ class _DownloadSourceStepPageState extends ConsumerState<DownloadSourceStepPage>
           title: l10n.setupSourceTitle,
           message: l10n.setupSourceMessage,
         ),
+        // 构建标记：真机对版用（排"装的不是新包"的雷）。
+        Text(
+          'build v3r18',
+          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant),
+        ),
         const SizedBox(height: 28),
         // 索引未到位也先亮三卡：源 chips 可选可换源重试，版本行显示占位。
         if (_indexLoading || _indexError != null || _index == null) ...[
