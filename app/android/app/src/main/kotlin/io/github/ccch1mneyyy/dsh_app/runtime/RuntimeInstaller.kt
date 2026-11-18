@@ -96,7 +96,11 @@ internal class RuntimeInstaller(
                         val rel = f.relativeTo(src).path
                         if (rel.isEmpty()) return@forEach
                         val target = File(staging, rel)
-                        if (f.isDirectory) target.mkdirs() else f.renameTo(target)
+                        if (f.isDirectory) target.mkdirs() else {
+                            // renameTo 跨文件系统(如 cache→files 分区)会失败且返回
+                            // false——不检查就静默丢文件,引擎残缺。失败回落 copyTo。
+                            if (!f.renameTo(target)) f.copyTo(target, overwrite = true)
+                        }
                     }
                     src.deleteRecursively()
                 }
