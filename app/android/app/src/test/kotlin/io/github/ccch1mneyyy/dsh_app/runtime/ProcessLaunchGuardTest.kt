@@ -119,6 +119,10 @@ class ProcessLaunchGuardTest {
         "app/android/app/src/main/kotlin/io/github/ccch1mneyyy/dsh_app/phone/background/RootProcess.kt",
         // Explicitly authorized Android Shell: Java-owned helper and its bounded child shell.
         "app/android/app/src/main/kotlin/io/github/ccch1mneyyy/dsh_app/phone/shell/AndroidShellProcess.kt",
+        // ubuntu-base 装机期自举（v3r14）：proot 调用形态与 DshProcess 同源（libproot.so
+        // + PROOT_LOADER，guest 命令换成 dpkg），固定 argv、10min 超时、失败抛错回滚，
+        // 不留半装 rootfs。2026-11-19 补登记——落地时漏了白名单（CI 存量债之一）。
+        "app/android/app/src/main/kotlin/io/github/ccch1mneyyy/dsh_app/runtime/DpkgBootstrap.kt",
         // The bounded privileged logcat reader also uses Java's fd-closing launcher.
         // The test below restricts this owner to one fixed-command ProcessBuilder.
         diagnosticJavaOwner,

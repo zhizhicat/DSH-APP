@@ -311,7 +311,7 @@ class _DownloadSourceStepPageState extends ConsumerState<DownloadSourceStepPage>
         ),
         // 构建标记：真机对版用（排"装的不是新包"的雷）。
         Text(
-          'build v3r18',
+          'build v3r23',
           style: Theme.of(context).textTheme.labelSmall?.copyWith(
               color: Theme.of(context).colorScheme.onSurfaceVariant),
         ),
@@ -530,7 +530,7 @@ class _SourceChip extends StatelessWidget {
         child: Row(mainAxisSize: MainAxisSize.min, children: [
           Text(source.name, style: theme.textTheme.labelMedium),
           const SizedBox(width: 6),
-          tail!,
+          tail,
         ]),
       ),
     );
