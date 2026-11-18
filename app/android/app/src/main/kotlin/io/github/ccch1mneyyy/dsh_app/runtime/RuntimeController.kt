@@ -398,6 +398,14 @@ class RuntimeController private constructor(private val app: Context) : DshProce
                 }
                 var baseDistBootstrapped: File? = null
                 var assembledEngine: File? = null
+                // 直拉组装模式下进度必须跨文件累计：每个小文件(deb/node tar/npm
+                // 包)各自回调 done/total,不累计的话 UI 会显示"2/2MB → 4/4MB"
+                // 跳变(当前文件而非总量)。doneSoFar 在每个文件完成后累加。
+                var doneSoFar = 0L
+                fun emitDownload(done: Long, total: Long) = emit(mapOf(
+                    "type" to "progress", "step" to "download",
+                    "done" to doneSoFar + done,
+                    "total" to if (total > 0) doneSoFar + total else 0L))
                 for (archive in toDownload) {
                     val layer = layerOf(archive.asset)
                     val prefix = layerPrefix[layer] ?: fallback
@@ -426,8 +434,9 @@ class RuntimeController private constructor(private val app: Context) : DshProce
                         RuntimeManifest.saveChannel(app, m)
                         synchronized(this) { channelManifest = m }
                         downloader.download(url, File(downloads, archive.asset), sha) { done, total ->
-                            emit(mapOf("type" to "progress", "step" to "download", "done" to done, "total" to total))
+                            emitDownload(done, total)
                         }
+                        doneSoFar += File(downloads, archive.asset).length()
                         // deb+python 增量包走 gh(无镜像),dpkg 自举阶段消费
                         bv.optJSONObject("debs")?.takeIf { it.optString("asset").isNotEmpty() }?.let { debs ->
                             val delta = File(downloads, debs.getString("asset"))
@@ -436,6 +445,7 @@ class RuntimeController private constructor(private val app: Context) : DshProce
                                 delta,
                                 debs.optString("sha256").ifEmpty { null }, debs.optLong("bytes", -1L),
                             ) { _, _ -> }
+                            doneSoFar += delta.length()
                             baseDistBootstrapped = delta
                         }
                         continue
@@ -467,8 +477,9 @@ class RuntimeController private constructor(private val app: Context) : DshProce
                             LayerSources.nodeDistUrl(distLayerSource, version, officialAsset),
                             File(downloads, archive.asset), sha,
                         ) { done, total ->
-                            emit(mapOf("type" to "progress", "step" to "download", "done" to done, "total" to total))
+                            emitDownload(done, total)
                         }
+                        doneSoFar += File(downloads, archive.asset).length()
                         continue
                     }
                     // npm-registry 原生源:registry 直拉 743 包闭包+pnpm+adapter/overlay 现场组装。
@@ -485,7 +496,8 @@ class RuntimeController private constructor(private val app: Context) : DshProce
                         val assembled = EngineCompose.assemble(
                             app, eng, npmSrc.distBase, fallback, downloads,
                             nodeKey, baseKey, downloader,
-                            { d, t -> emit(mapOf("type" to "progress", "step" to "download", "done" to d.toLong(), "total" to t.toLong())) },
+                            { d, t -> emitDownload(d.toLong(), t.toLong()) },
+
                             ::note,
                         )
                         assembledEngine = assembled
@@ -502,8 +514,9 @@ class RuntimeController private constructor(private val app: Context) : DshProce
                         prefix + channel.githubBase + archive.asset,
                         File(downloads, archive.asset), archive.sha256, archive.bytes,
                     ) { done, total ->
-                        emit(mapOf("type" to "progress", "step" to "download", "done" to done, "total" to total))
+                        emitDownload(done, total)
                     }
+                    doneSoFar += File(downloads, archive.asset).length()
                 }
                 val inst = RuntimeInstaller(app, m, ::note, source = FileArchiveSource(downloads))
                     .also { channelInstaller = it }
