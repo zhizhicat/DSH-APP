@@ -59,7 +59,7 @@ case "$DISTRO" in
   debian) UBUNTU_VERSION=""; APT_CODENAME="$([[ "$BASE_VER" == 12 ]] && echo bookworm || echo trixie)" ;;
   *) die "unsupported BASE distro: $BASE" ;;
 esac
-LXC_DATE="${LXC_DATE:-20261112_05:24}"   # lxc-images build stamp for debian rootfs pins
+LXC_DATE="${LXC_DATE:-20261117_05:24}"   # lxc-images build stamp for debian rootfs pins
 TERMUX_REPO="${TERMUX_REPO:-https://packages.termux.dev/apt/termux-main}"
 PROOT_VERSION="5.1.107.102"
 TALLOC_VERSION="2.5.0"
@@ -96,8 +96,8 @@ declare -A PIN=(
   [ubuntu-base-24.04.5-base-arm64.tar.gz]=a91d5a93010193712d346d761372b7c9db6dfcf093893161c64ca107f05914f2
   [ubuntu-base-24.04.5-base-amd64.tar.gz]=e77b6f10c2590cef872b33ee9f635a0e3fd1f57fb074c0e52b5c7f56147a0c86
   # debian LXC rootfs (sha256 computed at pin time; lxc-images publishes no SHA256SUMS, so these are mandatory)
-  [debian-rootfs-12-20261112_05:24-arm64.tar.xz]=c8954d0a514f104ad1ccf6c3ec2dafc5952f8ceae0e844d7d77275ad5e9115f4
-  [debian-rootfs-13-20261112_05:24-arm64.tar.xz]=24f442b0ab89fd1e302d149e71647f91735d34eec88430fc1b9d122ae2a546b7
+  [debian-rootfs-12-20261117_05:24-arm64.tar.xz]=125416b51b1272db7abd932bc7cc5f286fd29a190cb5a1b18460500f5448d5fc
+  [debian-rootfs-13-20261117_05:24-arm64.tar.xz]=6a5cc45b732de17e4ae1c90097694d01cba7fb0740208ba7fea403703b70a582
   [node-v24.22.1-linux-arm64.tar.xz]=dbabf7a1cbf947e6059ffad2c27b80041db97dea1e553b62afdee7f13fca336e
   [node-v24.22.1-linux-x64.tar.xz]=6c172a9ab6718f7b801fb5a7bd486af2ee5e32758086a04b84fcce2aa77095e6
   [proot_5.1.107.102_aarch64.deb]=10a394b585c2fc2b2c8502544f4e5f1be581dc8bfff79e8ba62f16207423e030
