@@ -103,6 +103,27 @@ class _DownloadSourceStepPageState extends ConsumerState<DownloadSourceStepPage>
     }
   }
 
+  bool _reprobing = false;
+
+  /// 重新探测三层全部源(保留选择,清空旧结果让 chips 重新显示探测中)。
+  Future<void> _reprobeAll() async {
+    if (_reprobing) return;
+    setState(() {
+      _reprobing = true;
+      _layerProbes.clear();
+    });
+    final nodeVersion = _choice?.node;
+    final layers = const ['base', 'node', 'engine'];
+    final futures = <Future<void>>[];
+    for (final layer in layers) {
+      for (final src in _layerSources[layer] ?? const <RuntimeSourceInfo>[]) {
+        futures.add(_probeLayer(layer, src.id, nodeVersion: nodeVersion));
+      }
+    }
+    await Future.wait(futures);
+    if (mounted) setState(() => _reprobing = false);
+  }
+
   /// 该 id 在此层池里有效则原样返回，否则 null。
   String? _validLayerSource(String layer, String? id) =>
       (id != null && (_layerSources[layer] ?? const []).any((s) => s.id == id)) ? id : null;
@@ -271,20 +292,36 @@ class _DownloadSourceStepPageState extends ConsumerState<DownloadSourceStepPage>
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     return OnboardingScaffold(
-      footer: FilledButton(
-        onPressed: _sourceId == null || _choice == null
-            ? null
-            : () async {
-                await LocalRuntimeController.saveVariantPrefs(
-                  sourceId: _sourceId!,
-                  choice: _choice!,
-                  nodeSourceId: _nodeSourceId,
-                  engineSourceId: _engineSourceId,
-                );
-                widget.onDone(_sourceId!, _choice!);
-              },
-        style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
-        child: Text(l10n.setupSourceStart),
+      footer: Row(
+        children: [
+          OutlinedButton(
+            onPressed: _reprobing ? null : _reprobeAll,
+            style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(52)),
+            child: _reprobing
+                ? const SizedBox(
+                    width: 20, height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2))
+                : Text(l10n.setupSourceReprobe),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: FilledButton(
+              onPressed: _sourceId == null || _choice == null
+                  ? null
+                  : () async {
+                      await LocalRuntimeController.saveVariantPrefs(
+                        sourceId: _sourceId!,
+                        choice: _choice!,
+                        nodeSourceId: _nodeSourceId,
+                        engineSourceId: _engineSourceId,
+                      );
+                      widget.onDone(_sourceId!, _choice!);
+                    },
+              style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
+              child: Text(l10n.setupSourceStart),
+            ),
+          ),
+        ],
       ),
       children: [
         const SizedBox(height: 8),

@@ -10346,6 +10346,7 @@
       }
     }
   },
+  "setupSourceReprobe": "重新探测",
   "setupSourceStart": "开始下载",
   "setupSourceRootfs": "系统底座",
   "setupSourceNode": "Node.js",
