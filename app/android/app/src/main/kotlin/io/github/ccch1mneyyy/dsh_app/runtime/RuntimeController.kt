@@ -539,7 +539,7 @@ class RuntimeController private constructor(private val app: Context) : DshProce
                 val delta = baseDistBootstrapped
                 if (delta != null && delta.isFile && inst.rootfs.isDirectory) {
                     emit(mapOf("type" to "progress", "step" to "bootstrap", "done" to 0, "total" to 1))
-                    DpkgBootstrap.run(app, inst.rootfs, delta, ::note)
+                    DpkgBootstrap.run(app, inst.rootfs, delta, ::note, baseKey)
                     emit(mapOf("type" to "progress", "step" to "bootstrap", "done" to 1, "total" to 1))
                 }
                 log("[dsh-app] runtime ready in ${(System.currentTimeMillis() - started) / 1000}s", "system")

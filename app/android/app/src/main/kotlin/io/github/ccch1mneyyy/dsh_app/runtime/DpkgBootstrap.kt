@@ -15,11 +15,19 @@ import java.util.concurrent.TimeUnit
  */
 internal object DpkgBootstrap {
 
+    /** apt 源代号按底座版本映射;未知版本回落 noble(24.04)。 */
+    private fun aptCodename(baseKey: String): String = when {
+        baseKey.startsWith("26.04") -> "resolute"   // Ubuntu 26.04 LTS
+        baseKey.startsWith("24.04") -> "noble"      // Ubuntu 24.04 LTS
+        else -> "noble"
+    }
+
     fun run(
         context: Context,
         rootfs: File,
         deltaTar: File,
         onLog: (String) -> Unit,
+        baseKey: String = "ubuntu-24.04.5",
     ) {
         val native = context.applicationInfo.nativeLibraryDir
         val tmp = File(context.cacheDir, "proot-tmp").apply { mkdirs() }
@@ -66,9 +74,9 @@ internal object DpkgBootstrap {
                 // 最小 overlay:DNS + apt 源(清华),与构建期 base 层等价
                 "echo 'nameserver 223.5.5.5' > /etc/resolv.conf; " +
                 "echo 'nameserver 8.8.8.8' >> /etc/resolv.conf; " +
-                "printf '%s\\n' 'deb https://mirrors.tuna.tsinghua.edu.cn/ubuntu-ports/ noble main universe' " +
-                "'deb https://mirrors.tuna.tsinghua.edu.cn/ubuntu-ports/ noble-updates main universe' " +
-                "'deb https://mirrors.tuna.tsinghua.edu.cn/ubuntu-ports/ noble-security main universe' > /etc/apt/sources.list; " +
+                "printf '%s\\n' 'deb https://mirrors.tuna.tsinghua.edu.cn/ubuntu-ports/ ${aptCodename(baseKey)} main universe' " +
+                "'deb https://mirrors.tuna.tsinghua.edu.cn/ubuntu-ports/ ${aptCodename(baseKey)}-updates main universe' " +
+                "'deb https://mirrors.tuna.tsinghua.edu.cn/ubuntu-ports/ ${aptCodename(baseKey)}-security main universe' > /etc/apt/sources.list; " +
                 "test -x /usr/bin/dpkg && test -f /etc/resolv.conf",
         )
         val proc = ProcessBuilder(argv).directory(context.filesDir).start()
