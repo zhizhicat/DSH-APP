@@ -9,6 +9,7 @@
   "setupSourceIndexFailed": "拉取版本列表失败。换一个源试试，或用默认通道。",
   "setupSourceUseDefault": "用默认通道下载",
   "setupSourceTotalBytes": "共需下载约 {mb} MB",
+  "setupSourceReprobe": "重新探测",
   "setupSourceStart": "开始下载",
   "@setupSourceMs": {
     "placeholders": {

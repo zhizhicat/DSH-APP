@@ -296,7 +296,10 @@ class _DownloadSourceStepPageState extends ConsumerState<DownloadSourceStepPage>
         children: [
           OutlinedButton(
             onPressed: _reprobing ? null : _reprobeAll,
-            style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(52)),
+            // 64 = 按钮类默认最小宽。不能用 Size.fromHeight(52)：
+            // fromHeight 的宽是 infinity，在 Row（不约束宽）里就是
+            // infinite width 布局错误，release 下断言剥掉后整个按钮静默消失。
+            style: OutlinedButton.styleFrom(minimumSize: const Size(64, 52)),
             child: _reprobing
                 ? const SizedBox(
                     width: 20, height: 20,
