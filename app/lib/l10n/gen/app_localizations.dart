@@ -31640,6 +31640,12 @@ abstract class L10n {
   /// **'共需下载约 {mb} MB'**
   String setupSourceTotalBytes(int mb);
 
+  /// No description provided for @setupSourceReprobe.
+  ///
+  /// In zh, this message translates to:
+  /// **'重新探测'**
+  String get setupSourceReprobe;
+
   /// No description provided for @setupSourceStart.
   ///
   /// In zh, this message translates to:

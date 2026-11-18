@@ -17243,6 +17243,9 @@ class L10nZh extends L10n {
   }
 
   @override
+  String get setupSourceReprobe => '重新探测';
+
+  @override
   String get setupSourceStart => '开始下载';
 
   @override
