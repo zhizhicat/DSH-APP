@@ -315,12 +315,6 @@ class RuntimeController private constructor(private val app: Context) : DshProce
                 inst.install(dropKept = false) { done, total ->
                     emit(mapOf("type" to "progress", "step" to "extract", "done" to done, "total" to total))
                 }
-                // ubuntu-base 组装模式:rootfs 就位后自举 deb 闭包(tzdata/CA/git 链)。
-                if (baseDistBootstrapped != null && inst.rootfs.isDirectory) {
-                    emit(mapOf("type" to "progress", "step" to "bootstrap", "done" to 0, "total" to 1))
-                    DpkgBootstrap.run(app, inst.rootfs, baseDistBootstrapped, ::note)
-                    emit(mapOf("type" to "progress", "step" to "bootstrap", "done" to 1, "total" to 1))
-                }
                 log("[dsh-app] runtime ready in ${(System.currentTimeMillis() - started) / 1000}s", "system")
                 error = null
                 strikes = 0
@@ -495,9 +489,10 @@ class RuntimeController private constructor(private val app: Context) : DshProce
                     emit(mapOf("type" to "progress", "step" to "extract", "done" to done, "total" to total))
                 }
                 // ubuntu-base 组装模式:rootfs 就位后自举 deb 闭包(tzdata/CA/git 链)。
-                if (baseDistBootstrapped != null && inst.rootfs.isDirectory) {
+                val delta = baseDistBootstrapped
+                if (delta != null && delta.isFile && inst.rootfs.isDirectory) {
                     emit(mapOf("type" to "progress", "step" to "bootstrap", "done" to 0, "total" to 1))
-                    DpkgBootstrap.run(app, inst.rootfs, baseDistBootstrapped, ::note)
+                    DpkgBootstrap.run(app, inst.rootfs, delta, ::note)
                     emit(mapOf("type" to "progress", "step" to "bootstrap", "done" to 1, "total" to 1))
                 }
                 log("[dsh-app] runtime ready in ${(System.currentTimeMillis() - started) / 1000}s", "system")
