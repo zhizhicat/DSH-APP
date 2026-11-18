@@ -32,7 +32,10 @@ download_cached() (
   trap 'rm -f -- "$pending_download"' EXIT
   trap 'exit 130' INT
   trap 'exit 143' TERM
-  curl -fL --retry 3 -o "$pending_download" "$url"
+  # 结构性挂起防御：连接/低速双超时——镜像站死连接时 curl 默认可无限等待，
+  # 卡住整个 toolchain 安装（CI 挂 30min 才被 job 级 timeout 收尸）。
+  curl -fL --retry 3 --connect-timeout 30 --speed-time 60 --speed-limit 1024 \
+    -o "$pending_download" "$url"
   mv -T -- "$pending_download" "$destination"
 )
 
