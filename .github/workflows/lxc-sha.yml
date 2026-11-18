@@ -1,0 +1,23 @@
+name: LXC sha helper
+on:
+  workflow_dispatch:
+    inputs:
+      date:
+        description: 'lxc-images date stamp'
+        default: '20261117_05:24'
+jobs:
+  sha:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Fetch and hash
+        run: |
+          set -euo pipefail
+          D="${{ github.event.inputs.date }}"
+          for d in trixie bookworm; do
+            curl -fL --retry 3 --connect-timeout 20 \
+              "https://images.linuxcontainers.org/images/debian/$d/arm64/default/$D/rootfs.tar.xz" \
+              -o /tmp/$d.tar.xz
+            printf '%s %s %s\n' "$d" "$(sha256sum /tmp/$d.tar.xz | cut -d' ' -f1)" \
+              "$(stat -c %s /tmp/$d.tar.xz)" | tee -a "$GITHUB_STEP_SUMMARY"
+          done
