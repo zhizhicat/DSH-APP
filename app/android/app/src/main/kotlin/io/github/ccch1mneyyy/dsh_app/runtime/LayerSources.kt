@@ -36,8 +36,13 @@ internal object LayerSources {
         LayerSource("github", "GitHub 直连", "gh-mirror", prefix = ""),
     )
 
-    /** rootfs：gh 四镜像（B 波再追加 TUNA-LXC / 官方 LXC） */
-    val base: List<LayerSource> = ghMirrors
+    /** rootfs：gh 四镜像 + ubuntu-base 原生源（镜像站直拉 rootfs+deb 增量组装） */
+    val base: List<LayerSource> = ghMirrors + listOf(
+        LayerSource("tuna-cdimage", "清华 TUNA · ubuntu-base", "ubuntu-base",
+            distBase = "https://mirrors.tuna.tsinghua.edu.cn/ubuntu-cdimage/ubuntu-base/releases", probePath = ""),
+        LayerSource("ubuntu-cdimage", "Ubuntu 官方 cdimage", "ubuntu-base",
+            distBase = "https://cdimage.ubuntu.com/ubuntu-base/releases", probePath = ""),
+    )
 
     /** node：gh 四镜像 + 五个 node-dist 原生源（官方 tar 直拉，装机期重映射层布局） */
     val node: List<LayerSource> = ghMirrors + listOf(

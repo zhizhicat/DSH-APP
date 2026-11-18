@@ -315,6 +315,12 @@ class RuntimeController private constructor(private val app: Context) : DshProce
                 inst.install(dropKept = false) { done, total ->
                     emit(mapOf("type" to "progress", "step" to "extract", "done" to done, "total" to total))
                 }
+                // ubuntu-base 组装模式:rootfs 就位后自举 deb 闭包(tzdata/CA/git 链)。
+                if (baseDistBootstrapped != null && inst.rootfs.isDirectory) {
+                    emit(mapOf("type" to "progress", "step" to "bootstrap", "done" to 0, "total" to 1))
+                    DpkgBootstrap.run(app, inst.rootfs, baseDistBootstrapped, ::note)
+                    emit(mapOf("type" to "progress", "step" to "bootstrap", "done" to 1, "total" to 1))
+                }
                 log("[dsh-app] runtime ready in ${(System.currentTimeMillis() - started) / 1000}s", "system")
                 error = null
                 strikes = 0
@@ -396,9 +402,49 @@ class RuntimeController private constructor(private val app: Context) : DshProce
                     asset.startsWith("engine-") -> "engine"
                     else -> "base"
                 }
+                var baseDistBootstrapped: File? = null
                 for (archive in toDownload) {
                     val layer = layerOf(archive.asset)
                     val prefix = layerPrefix[layer] ?: fallback
+                    // ubuntu-base 原生源:镜像站直拉 rootfs(SHA256SUMS 校验) + deb 增量包,
+                    // 装机期由 dpkgBootstrap 在 rootfs 就位后自举 deb 闭包。
+                    val baseDist = if (layer == "base")
+                        LayerSources.find("base", baseSourceId) else null
+                    if (baseDist?.kind == "ubuntu-base") {
+                        val idxObj = JSONObject(File(downloads, "layers-index.json").readText())
+                        val compose = idxObj.optJSONObject("compose")
+                            ?: throw IOException("layers index carries no compose block; re-release layers first")
+                        val bv = compose.optJSONObject("baseVariants")
+                            ?.optJSONObject("$baseKey-arm64-v8a") // 形如 ubuntu-24.04.5-arm64-v8a
+                            ?: throw IOException("compose has no base variant $baseKey-$abi")
+                        val rootfs = bv.optJSONObject("rootfs")
+                            ?: throw IOException("compose base variant missing rootfs")
+                        val sha = rootfs.getString("sha256")
+                        val mirrors = (1..rootfs.getJSONArray("mirrors").length())
+                            .map { rootfs.getJSONArray("mirrors").getString(it - 1) }
+                        val host = java.net.URI(baseDist.distBase).host ?: ""
+                        val url = mirrors.firstOrNull { it.contains(host) } ?: mirrors.first()
+                        log("[dsh-app] base layer via ${baseDist.id} (ubuntu-base, $url)", "system")
+                        m = m.copy(archives = m.archives.map {
+                            if (it.asset == archive.asset) it.copy(sha256 = sha) else it
+                        })
+                        RuntimeManifest.saveChannel(app, m)
+                        synchronized(this) { channelManifest = m }
+                        downloader.download(url, File(downloads, archive.asset), sha) { done, total ->
+                            emit(mapOf("type" to "progress", "step" to "download", "done" to done, "total" to total))
+                        }
+                        // deb+python 增量包走 gh(无镜像),dpkg 自举阶段消费
+                        bv.optJSONObject("debs")?.takeIf { it.optString("asset").isNotEmpty() }?.let { debs ->
+                            val delta = File(downloads, debs.getString("asset"))
+                            downloader.download(
+                                fallback + channel.githubBase + debs.getString("asset"),
+                                delta,
+                                debs.optString("sha256").ifEmpty { null }, debs.optLong("bytes", -1L),
+                            ) { _, _ -> }
+                            baseDistBootstrapped = delta
+                        }
+                        continue
+                    }
                     // node-dist 原生源:官方 tar 直拉(SHASUMS256.txt 校验),
                     // install 期由 restageOfficialNodeTar 重映射为层布局。
                     var distLayerSource = if (layer == "node")
@@ -447,6 +493,12 @@ class RuntimeController private constructor(private val app: Context) : DshProce
                 }
                 inst.install(dropKept = false) { done, total ->
                     emit(mapOf("type" to "progress", "step" to "extract", "done" to done, "total" to total))
+                }
+                // ubuntu-base 组装模式:rootfs 就位后自举 deb 闭包(tzdata/CA/git 链)。
+                if (baseDistBootstrapped != null && inst.rootfs.isDirectory) {
+                    emit(mapOf("type" to "progress", "step" to "bootstrap", "done" to 0, "total" to 1))
+                    DpkgBootstrap.run(app, inst.rootfs, baseDistBootstrapped, ::note)
+                    emit(mapOf("type" to "progress", "step" to "bootstrap", "done" to 1, "total" to 1))
                 }
                 log("[dsh-app] runtime ready in ${(System.currentTimeMillis() - started) / 1000}s", "system")
                 error = null
