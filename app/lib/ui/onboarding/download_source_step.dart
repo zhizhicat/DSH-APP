@@ -271,8 +271,23 @@ class _DownloadSourceStepPageState extends ConsumerState<DownloadSourceStepPage>
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     return OnboardingScaffold(
+      footer: FilledButton(
+        onPressed: _sourceId == null || _choice == null
+            ? null
+            : () async {
+                await LocalRuntimeController.saveVariantPrefs(
+                  sourceId: _sourceId!,
+                  choice: _choice!,
+                  nodeSourceId: _nodeSourceId,
+                  engineSourceId: _engineSourceId,
+                );
+                widget.onDone(_sourceId!, _choice!);
+              },
+        style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
+        child: Text(l10n.setupSourceStart),
+      ),
       children: [
-        const Spacer(),
+        const SizedBox(height: 8),
         OnboardingHeader(
           icon: AppIcons.download,
           title: l10n.setupSourceTitle,
@@ -376,22 +391,6 @@ class _DownloadSourceStepPageState extends ConsumerState<DownloadSourceStepPage>
             textAlign: TextAlign.center,
           ),
         ],
-        const SizedBox(height: 24),
-        FilledButton(
-          onPressed: _sourceId == null || _choice == null
-              ? null
-              : () async {
-                  await LocalRuntimeController.saveVariantPrefs(
-                    sourceId: _sourceId!,
-                    choice: _choice!,
-                    nodeSourceId: _nodeSourceId,
-                    engineSourceId: _engineSourceId,
-                  );
-                  widget.onDone(_sourceId!, _choice!);
-                },
-          style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
-          child: Text(l10n.setupSourceStart),
-        ),
         const SizedBox(height: 16),
       ],
     );

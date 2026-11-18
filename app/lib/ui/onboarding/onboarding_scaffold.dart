@@ -55,7 +55,7 @@ class OnboardingProgress extends InheritedWidget {
 /// holds its capsule, centred; the row keeps its height whether the capsule
 /// shows or not, and steps aside for the keyboard.
 class OnboardingScaffold extends StatelessWidget {
-  const OnboardingScaffold({super.key, required this.children, this.leading, this.showRuntime = true});
+  const OnboardingScaffold({super.key, required this.children, this.leading, this.showRuntime = true, this.footer});
 
   /// Laid out in a full-height column; use [Spacer]s to distribute space.
   final List<Widget> children;
@@ -65,6 +65,9 @@ class OnboardingScaffold extends StatelessWidget {
 
   /// False on a page that shows the unpack itself (a big halo): no capsule.
   final bool showRuntime;
+
+  /// Pinned below the scrolling area (the start button); null = no footer slot.
+  final Widget? footer;
 
   /// Space under the capsule, above the bottom safe area.
   static const capsuleBottom = 12.0;
@@ -123,6 +126,11 @@ class OnboardingScaffold extends StatelessWidget {
                         ),
                       ),
                     ),
+                    if (footer case final footer?)
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(24, 8, 24, 8),
+                        child: SizedBox(width: double.infinity, child: footer),
+                      ),
                     if (capsule)
                       Padding(
                         key: const ValueKey('setup-capsule-slot'),
