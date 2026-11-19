@@ -1678,6 +1678,22 @@ def cmd_assemble(args):
     entries["opt/dsh-go/direct/native-addons.json"] = Entry(
         "file", 0o644, data=(json.dumps(direct_native_inventory(entries), sort_keys=True) + "\n").encode(), origin="overlay")
 
+    # merged-/usr normalisation (debuerreotype bases, 2026-11-19): docker 官方
+    # debian rootfs 的 /bin /lib /lib64 /sbin 是指向 usr/* 的符号链接,而 deb 闭包
+    # 的成员仍按传统布局打在 lib/aarch64-linux-gnu/... 下(dpkg 落盘时本会穿过
+    # 符号链接)。组装层不穿链接——把顶层合并前缀下的成员一律改写到 usr/ 前缀下
+    # 再做父目录/符号链接不变量检查。LXC 底座顶层是真目录,永不触发。
+    for _top in ("bin", "lib", "lib64", "sbin"):
+        _e = entries.get(_top)
+        if _e is None or _e.kind != "symlink":
+            continue
+        if _e.link not in ("usr/" + _top, "/usr/" + _top):
+            continue
+        _prefix = _top + "/"
+        for _p in [p for p in entries if p.startswith(_prefix)]:
+            entries["usr/" + _p] = entries.pop(_p)
+            report.setdefault("mergedUsrRewrites", []).append("%s -> usr/%s" % (_p, _p))
+
     # 6. Implicit parents, symlink normalisation, mode normalisation
     for p in list(entries):
         parent = posixpath.dirname(p)
