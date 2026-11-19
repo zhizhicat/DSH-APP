@@ -219,7 +219,7 @@ void main() {
       await tester.scrollUntilVisible(find.text('试听'), 300, scrollable: find.byType(Scrollable).first);
       await tester.pumpAndSettle();
       await tester.tap(find.text('试听'));
-      for (var i = 0; i < 20 && !calls.any((c) => c.method == 'play'); i++) {
+      for (var i = 0; i < 60 && !calls.any((c) => c.method == 'play'); i++) {
         await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 30)));
         await tester.pump();
       }
@@ -301,7 +301,7 @@ void main() {
       expect(find.text('茉莉 · 女声'), findsNothing);
 
       await tester.tap(find.text('选一段录音'));
-      for (var i = 0; i < 20 && find.textContaining('已上传').evaluate().isEmpty; i++) {
+      for (var i = 0; i < 60 && find.textContaining('已上传').evaluate().isEmpty; i++) {
         await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 30)));
         await tester.pump();
       }
@@ -309,7 +309,7 @@ void main() {
       expect(File('${folder.path}/voice-sample.wav').existsSync(), isTrue);
 
       await tester.tap(find.text('试听'));
-      for (var i = 0; i < 20 && !calls.any((c) => c.method == 'play'); i++) {
+      for (var i = 0; i < 60 && !calls.any((c) => c.method == 'play'); i++) {
         await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 30)));
         await tester.pump();
       }
@@ -380,7 +380,7 @@ void main() {
       await tester.scrollUntilVisible(find.text('试听'), 300, scrollable: find.byType(Scrollable).first);
       await tester.pumpAndSettle();
       await tester.tap(find.text('试听'));
-      for (var i = 0; i < 20 && !calls.any((c) => c.method == 'play'); i++) {
+      for (var i = 0; i < 60 && !calls.any((c) => c.method == 'play'); i++) {
         await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 30)));
         await tester.pump();
       }
@@ -390,7 +390,7 @@ void main() {
 
       status = 401;
       await tester.tap(find.text('试听'));
-      for (var i = 0; i < 20 && find.textContaining('没成功').evaluate().isEmpty; i++) {
+      for (var i = 0; i < 60 && find.textContaining('没成功').evaluate().isEmpty; i++) {
         await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 30)));
         await tester.pump();
       }

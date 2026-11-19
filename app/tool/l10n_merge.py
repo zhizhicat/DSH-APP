@@ -303,6 +303,16 @@ def main(argv):
     if r.returncode != 0:
         print('✗ flutter gen-l10n failed')
         return r.returncode
+    # gen-l10n 的换行不受 analysis_options 的 page_width 约束,不同环境的
+    # 生成器版本会产出不同折行(CI 单行 120 宽 vs 本地 80 宽换行,2026-11-19
+    # CI `git diff --exit-code` 连红实锤)。gen 后统一 dart format 一次,
+    # 吃项目 formatter.page_width=120,双端产物字节级归一。
+    dart = os.path.join(os.path.dirname(os.path.realpath(flutter)),
+                        'cache', 'dart-sdk', 'bin', 'dart')
+    r = subprocess.run([dart, 'format', 'lib/l10n/gen'], cwd=APP)
+    if r.returncode != 0:
+        print('✗ dart format on lib/l10n/gen failed')
+        return r.returncode
     print('✓ gen-l10n → lib/l10n/gen/')
     return 0
 
