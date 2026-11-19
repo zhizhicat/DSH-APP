@@ -461,9 +461,10 @@ void main() {
       await tester.tap(find.widgetWithText(FilledButton, '安装'));
       await _frames(tester, 3);
       expect(runtime.calls, ['install']);
-      // 下载页降噪(2026-11-19):标题与小字行都收起,进度环+meta行说明一切。
-      expect(find.text('正在准备运行环境'), findsNothing);
-      expect(find.byKey(const ValueKey('pct')), findsOneWidget);
+      // RecordingLocalRuntime.install() 只记账不动 phase——点完仍停在
+      // waiting 态,标题按设计保留;真 installing 态的降噪由 shell_golden
+      // 的 setup_40 基线(无标题无小字)覆盖。
+      expect(find.text('正在准备运行环境'), findsOneWidget);
 
       runtime.emit(stoppedStatus);
       await _frames(tester, 20);

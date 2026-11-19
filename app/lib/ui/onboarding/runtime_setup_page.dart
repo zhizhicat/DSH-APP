@@ -184,17 +184,19 @@ class _RuntimeSetupPageState extends ConsumerState<RuntimeSetupPage> {
     };
 
     final title = switch (view) {
-      // 下载页降噪（2026-11-19 反馈）：下载中不铺标题——环形进度+百分比
-      // 已说明一切，页面只留 meta 行（层名 · 兆数 · 耗时）说自己在干嘛。
-      _SetupView.installing => null,
+      // 前台安装页降噪（2026-11-19 反馈）：下载中不铺标题——环形进度+百分比
+      // +meta 行已说明一切。并行等待页（人在别的步骤，回头看）保留标题。
+      _SetupView.installing when !widget.waiting => null,
       _SetupView.waiting ||
+      _SetupView.installing ||
       _SetupView.choose => _upgrade ? l10n.shellRuntimeUpdating : l10n.shellRuntimePreparing,
       _SetupView.done => l10n.shellRuntimeReady,
       _SetupView.failed => l10n.shellRuntimeIncomplete,
     };
     final body = switch (view) {
-      _SetupView.installing => null,
-      _SetupView.waiting || _SetupView.choose when widget.waiting => l10n.setupWaitingBody,
+      // 前台安装页降噪：下载中不铺「正在下载运行环境（约 xxx MB）」小字。
+      _SetupView.installing when !widget.waiting => null,
+      _SetupView.waiting || _SetupView.installing || _SetupView.choose when widget.waiting => l10n.setupWaitingBody,
       _SetupView.waiting ||
       _SetupView.choose => _upgrade ? l10n.shellRuntimeFilesKept : l10n.shellRuntimeFirstSetup,
       _SetupView.done => l10n.shellRuntimeContinuing,
