@@ -121,6 +121,14 @@ internal class RuntimeInstaller(
         }
         onProgress(total, total)
 
+        // 三层装机：engine 层是跨 base×node 组合共享的，其静态 runtime.json 记录的
+        // 是构建时那一组组合（node/ubuntu/upgrade/baseCompatibility 对其余组合都是
+        // 陈旧快照），而首装/升级校验都要求它与所选组合一致——2026-11-19 首装即被
+        // "manifest" 阻断。每层字节已被 sha 钉死，组合身份以 manifest（所选）为准，
+        // 在校验前重写 staged runtime.json；engine 自有事实（dshPatches/dshGoBridge/
+        // pnpmVersion，引擎层内为真）保留。
+        if (manifest.raw.optInt("schema", 1) == 2) writeLayeredRuntimeInfo(staging, manifest.raw)
+
         val groupNames = appendAndroidGroupNames(staging,
             runCatching { File("/proc/self/task/${android.os.Process.myTid()}/status").readText() }.getOrNull())
         onLog("[dsh-app] install group names: " +
@@ -130,6 +138,18 @@ internal class RuntimeInstaller(
             activateRuntimeUpdate(baseDir, manifest.runtimeVersion, manifest.abi, manifest.raw,
                 keepDir, dropKept, sync = { timed("sync") { sync() } }, onLog = onLog)
         }
+    }
+
+    /** Schema-3 identity for the person's chosen base×node×engine combination. */
+    private fun writeLayeredRuntimeInfo(staging: File, raw: JSONObject) {
+        val target = File(staging, "etc/dsh-app/runtime.json")
+        val info = runCatching { JSONObject(target.readText()) }.getOrNull() ?: JSONObject()
+        for (key in listOf("runtimeVersion", "abi", "dshVersion", "nodeVersion", "ubuntuVersion",
+                           "upgrade", "baseCompatibility")) {
+            if (raw.has(key)) info.put(key, raw.get(key))
+        }
+        target.parentFile?.mkdirs()
+        target.writeText(info.toString(2) + "\n")
     }
 
     private inline fun <T> timed(phase: String, block: () -> T): T {

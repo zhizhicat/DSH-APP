@@ -1214,14 +1214,17 @@ def partition_entries(entries):
     split_node = partition_entries.split_node
     # Two-layer mode: node paths belong to the engine layer (upstream semantics,
     # so engine-only changes reuse the cached base bytes). Three-layer mode:
-    # node goes to its own layer instead.
+    # node goes to its own layer instead — and must be tested BEFORE the engine
+    # set: ENGINE_PATHS still lists opt/node for the legacy upgrade contract, so
+    # an engine-first check would swallow every node path and ship an empty
+    # node layer (116-byte tar, 2026-11-19 实锤).
     engine_paths = ENGINE_PATHS
     base, node_layer, engine = {}, {}, {}
     for p, e in entries.items():
-        if owned_by(engine_paths, p):
-            engine[p] = e
-        elif split_node and owned_by(NODE_PATHS, p):
+        if split_node and owned_by(NODE_PATHS, p):
             node_layer[p] = e
+        elif owned_by(engine_paths, p):
+            engine[p] = e
         else:
             base[p] = e
     for tree in ([node_layer] if split_node else []) + [engine]:
