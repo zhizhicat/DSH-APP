@@ -142,15 +142,19 @@ class RuntimeFailure {
 /// One entry of assets/channels.json, as the Kotlin side reports it.
 /// A download mirror prefix from channels.json (schema 3).
 class RuntimeSourceInfo {
-  const RuntimeSourceInfo({required this.id, required this.name, required this.prefix});
+  const RuntimeSourceInfo({required this.id, required this.name, required this.prefix, this.kind});
   final String id;
   final String name;
   final String prefix;
+  /// gh-mirror | node-dist | ubuntu-base: ubuntu-base sources only carry
+  /// ubuntu rootfs — they must hide when a debian base is picked.
+  final String? kind;
 
   factory RuntimeSourceInfo.fromMap(Map<Object?, Object?> map) => RuntimeSourceInfo(
     id: map['id'] as String,
     name: map['name'] as String? ?? map['id'] as String,
     prefix: map['prefix'] as String? ?? '',
+    kind: map['kind'] as String?,
   );
 }
 

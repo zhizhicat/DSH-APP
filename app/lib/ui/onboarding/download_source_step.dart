@@ -158,7 +158,7 @@ class _DownloadSourceStepPageState extends ConsumerState<DownloadSourceStepPage>
   }
 
   String? _nextSourceAfter(String id, Set<String> tried) {
-    final pool = _layerSources['base'] ?? _sources;
+    final pool = _basePool();
     // 探测可用且延迟最低的未试源优先；没有探测结果时按池序。
     final candidates = pool.where((s) => !tried.contains(s.id)).toList()
       ..sort((a, b) {
@@ -200,15 +200,38 @@ class _DownloadSourceStepPageState extends ConsumerState<DownloadSourceStepPage>
       } else {
         _indexError = null;
         _choice = _validChoice(preferred, index) ?? LayersChoice.defaultFor(index);
+        // 保存过的组合可能带着「ubuntu 原生源 + debian 底座」（旧 bug 状态的
+        // 持久化复活）：源不在当前底座池里就回落到池里最优。
+        if (_sourceId != null && !_basePool().any((s) => s.id == _sourceId)) {
+          final next = _nextSourceAfter(_sourceId!, {_sourceId!});
+          if (next != null) _sourceId = next;
+        }
       }
     });
     return index == null;
   }
 
+  /// 底座源按所选底座过滤：ubuntu-base 原生源只载 ubuntu rootfs
+  /// （Debian 官方不发布 rootfs tarball，直拉路线不存在），选 debian 时
+  /// 必须收进 gh 镜像——否则"Ubuntu 官方 cdimage"还亮着且可选中，
+  /// 装机会走 ubuntu 直拉路（2026-11-19 截图实锤：debian-12 + 高亮 cdimage 源）。
+  List<RuntimeSourceInfo> _basePool() {
+    final pool = _layerSources['base'] ?? _sources;
+    final base = _choice?.base;
+    if (base == null || base.startsWith('ubuntu-')) return pool;
+    return pool.where((s) => s.kind != 'ubuntu-base').toList();
+  }
+
   /// Applies a layer pick and remembers it right away, so leaving mid-download
   /// still resumes into the same selection (the download itself caches too).
   void _pick(LayersChoice choice) {
+    final baseChanged = _choice?.base != choice.base;
     setState(() => _choice = choice);
+    if (baseChanged && _sourceId != null && !_basePool().any((s) => s.id == _sourceId)) {
+      // 选中源随底座失效（ubuntu 原生源遇 debian）：回落到剩余源里最优。
+      final next = _nextSourceAfter(_sourceId!, {_sourceId!});
+      if (next != null) setState(() => _sourceId = next);
+    }
     final sourceId = _sourceId;
     if (sourceId != null) {
       unawaited(LocalRuntimeController.saveVariantPrefs(
@@ -311,7 +334,7 @@ class _DownloadSourceStepPageState extends ConsumerState<DownloadSourceStepPage>
         ),
         // 构建标记：真机对版用（排"装的不是新包"的雷）。
         Text(
-          'build v3r24',
+          'build v3r25',
           style: Theme.of(context).textTheme.labelSmall?.copyWith(
               color: Theme.of(context).colorScheme.onSurfaceVariant),
         ),
@@ -329,7 +352,7 @@ class _DownloadSourceStepPageState extends ConsumerState<DownloadSourceStepPage>
             variants: const [],
             selectedKey: '',
             onVariant: (_) {},
-            sources: _layerSources['base'] ?? _sources,
+            sources: _basePool(),
             selectedSourceId: _sourceId,
             onSource: (id) => unawaited(_selectSource(id, _choice)),
             probes: _layerProbes,
@@ -374,7 +397,7 @@ class _DownloadSourceStepPageState extends ConsumerState<DownloadSourceStepPage>
             variants: _index!.base,
             selectedKey: _choice!.base,
             onVariant: (k) => _pick(LayersChoice(base: k, node: _choice!.node, engine: _choice!.engine)),
-            sources: _layerSources['base'] ?? const [],
+            sources: _basePool(),
             selectedSourceId: _sourceId,
             onSource: (id) => unawaited(_selectSource(id, _choice)),
             probes: _layerProbes,
