@@ -196,7 +196,9 @@ class _RuntimeSetupPageState extends ConsumerState<RuntimeSetupPage> {
     final body = switch (view) {
       // 前台安装页降噪：下载中不铺「正在下载运行环境（约 xxx MB）」小字。
       _SetupView.installing when !widget.waiting => null,
-      _SetupView.waiting || _SetupView.installing || _SetupView.choose when widget.waiting => l10n.setupWaitingBody,
+      // 并行等待页的安装中：完成后自动进入。
+      _SetupView.installing => l10n.setupWaitingBody,
+      _SetupView.waiting || _SetupView.choose when widget.waiting => l10n.setupWaitingBody,
       _SetupView.waiting ||
       _SetupView.choose => _upgrade ? l10n.shellRuntimeFilesKept : l10n.shellRuntimeFirstSetup,
       _SetupView.done => l10n.shellRuntimeContinuing,
