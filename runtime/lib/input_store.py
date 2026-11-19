@@ -114,21 +114,25 @@ def inventory(repo, npm_locks=None, all_locks=False):
             "license": None, "license_note": "inspect original copyright/COPYING and corresponding source before redistribution",
         })
 
-    # fork: multi-distro base rootfs (Debian LXC images; no upstream checksums, PIN-mandated)
+    # fork: multi-distro base rootfs (Debian debuerreotype artifacts from the doi-janky
+    # jenkins job; upstream publishes no stable checksums, so these are PIN-mandated —
+    # mirrors debian_base()'s build#/lastSuccessfulBuild dual URL).
     codename_for = {"12": "bookworm", "13": "trixie"}
     for name, pin in pins.items():
-        m = re.fullmatch(r"debian-rootfs-(\d+)-(\d{8}_\d\d:\d\d)-(arm64|amd64)\.tar\.xz", name)
+        m = re.fullmatch(r"debian-rootfs-debuerreotype-(\d+)-(arm64|amd64)\.tar\.xz", name)
         if m is None:
             continue
-        ver, stamp, arch = m.groups()
+        ver, arch = m.groups()
         codename = codename_for.get(ver)
         if codename is None:
             continue
-        urls = [values["DEBIAN_LXC_MIRRORS"].split()[0] + "/" + codename + "/" + arch + "/default/" + stamp + "/rootfs.tar.xz"]
+        job = values["DEBIAN_DEBUE_JOB"]
+        urls = [job + "/" + values["DEBIAN_DEBUE_BUILD"] + "/artifact/" + codename + "/rootfs.tar.xz",
+                job + "/lastSuccessfulBuild/artifact/" + codename + "/rootfs.tar.xz"]
         add_object(objects, "sha256", pin, urls, {
             "kind": "debian_rootfs", "name": name, "abi": "arm64-v8a" if arch == "arm64" else "x86_64",
             "source": "build-runtime.sh:PIN[" + name + "]",
-            "license": None, "license_note": "LXC image; inspect archive copyright before redistribution",
+            "license": None, "license_note": "debuerreotype image; inspect archive copyright before redistribution",
         }, None)
         used_pins.add(name)
 

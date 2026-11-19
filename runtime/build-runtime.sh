@@ -80,8 +80,6 @@ NODE_MIRRORS="${NODE_MIRRORS:-https://npmmirror.com/mirrors/node https://nodejs.
 NODE_MIRROR="${NODE_MIRROR:-https://npmmirror.com/mirrors/node}"
 NPM_REGISTRIES="${NPM_REGISTRIES:-https://registry.npmmirror.com https://mirrors.huaweicloud.com/repository/npm https://mirrors.cloud.tencent.com/npm https://registry.npmjs.org}"
 NPM_REGISTRY="${NPM_REGISTRY:-https://registry.npmmirror.com}"
-DEBIAN_LXC_MIRRORS="${DEBIAN_LXC_MIRRORS:-https://images.linuxcontainers.org/images/debian https://mirrors.tuna.tsinghua.edu.cn/lxc-images/images/debian https://mirrors.huaweicloud.com/linuxcontainers/images/debian https://mirrors.ustc.edu.cn/linuxcontainers/images/debian}"
-DEBIAN_LXC_MIRROR="${DEBIAN_LXC_MIRROR:-https://mirrors.tuna.tsinghua.edu.cn/lxc-images/images/debian}"  # debian BASE（legacy 单镜像覆盖）
 DEBIAN_ARCHIVE="https://mirrors.tuna.tsinghua.edu.cn/debian"                      # debian BASE: one pool serves both architectures
 DEBIAN_SECURITY="https://mirrors.tuna.tsinghua.edu.cn/debian-security"            # debian security updates live in a separate pool
 # debian BASE rootfs: debuerreotype (docker-debian-artifacts, 与 kelivo 同源)。
@@ -102,9 +100,6 @@ PBS_MIRROR="https://registry.npmmirror.com/-/binary/python-build-standalone"
 declare -A PIN=(
   [ubuntu-base-24.04.5-base-arm64.tar.gz]=a91d5a93010193712d346d761372b7c9db6dfcf093893161c64ca107f05914f2
   [ubuntu-base-24.04.5-base-amd64.tar.gz]=e77b6f10c2590cef872b33ee9f635a0e3fd1f57fb074c0e52b5c7f56147a0c86
-  # debian LXC rootfs (sha256 computed at pin time; lxc-images publishes no SHA256SUMS, so these are mandatory)
-  [debian-rootfs-12-20261117_05:24-arm64.tar.xz]=125416b51b1272db7abd932bc7cc5f286fd29a190cb5a1b18460500f5448d5fc
-  [debian-rootfs-13-20261117_05:24-arm64.tar.xz]=6a5cc45b732de17e4ae1c90097694d01cba7fb0740208ba7fea403703b70a582
   # debian debuerreotype rootfs (sha256 与 dist-arm64v8 分支和 jenkins 构件旁的 .sha256 三方核对一致, 2026-11-19)
   [debian-rootfs-debuerreotype-12-arm64.tar.xz]=b054be256d2b0c9e4d8c973bfafb2d89899f30c735bbf0f0e08db6bfc5728851
   [debian-rootfs-debuerreotype-13-arm64.tar.xz]=ea5b2e1a47bd2573fe42b902d6cb87787dcf551849b22322bc4d262ff4c2d3f3
