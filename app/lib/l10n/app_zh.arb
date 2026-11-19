@@ -10391,6 +10391,14 @@
   "shellRuntimeFilesKept": "对话和文件都会保留",
   "shellRuntimeFirstSetup": "首次准备约需一两分钟",
   "shellRuntimeDownloading": "正在下载运行环境（约 150 MB，仅此一次）",
+  "shellRuntimeDownloadingSize": "正在下载运行环境（约 {mb} MB，仅此一次）",
+  "@shellRuntimeDownloadingSize": {
+    "placeholders": {
+      "mb": {
+        "type": "int"
+      }
+    }
+  },
   "shellRuntimeContinuing": "即将继续",
   "shellRuntimeRestoreFailed": "没能放回保留的内容",
   "shellRuntimeExtractFailed": "解压时出错",
@@ -10398,6 +10406,17 @@
   "shellRuntimeLocalOnly": "全程在本机完成",
   "shellRuntimeContinueWithoutKept": "不保留，继续安装",
   "shellRuntimeAlmostDone": "马上就好",
+  "shellRuntimeLayerBase": "正在下载系统底座",
+  "shellRuntimeLayerNode": "正在下载 Node.js",
+  "shellRuntimeLayerEngine": "正在下载 DSH",
+  "shellRuntimeElapsed": "已用 {count}",
+  "@shellRuntimeElapsed": {
+    "placeholders": {
+      "count": {
+        "type": "String"
+      }
+    }
+  },
   "shellRuntimeSecondsRemaining": "约 {count} 秒",
   "@shellRuntimeSecondsRemaining": {
     "placeholders": {

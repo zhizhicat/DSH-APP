@@ -191,7 +191,11 @@ class _RuntimeSetupPageState extends ConsumerState<RuntimeSetupPage> {
       _SetupView.failed => l10n.shellRuntimeIncomplete,
     };
     final body = switch (view) {
-      _SetupView.installing when state.progress?.step == 'download' => l10n.shellRuntimeDownloading,
+      // 三层总量逐层揭示,写死的"约 150 MB"在 203MB 的今天已经说谎
+      // (2026-11-19 反馈):总量已知时报实数,未知才回落到旧文案。
+      _SetupView.installing when state.progress?.step == 'download' => state.progress!.total > 0
+          ? l10n.shellRuntimeDownloadingSize((state.progress!.total / (1024 * 1024)).round())
+          : l10n.shellRuntimeDownloading,
       _SetupView.waiting || _SetupView.installing || _SetupView.choose when widget.waiting => l10n.setupWaitingBody,
       _SetupView.waiting ||
       _SetupView.installing ||

@@ -17350,6 +17350,11 @@ class L10nZh extends L10n {
   String get shellRuntimeDownloading => '正在下载运行环境（约 150 MB，仅此一次）';
 
   @override
+  String shellRuntimeDownloadingSize(int mb) {
+    return '正在下载运行环境（约 $mb MB，仅此一次）';
+  }
+
+  @override
   String get shellRuntimeContinuing => '即将继续';
 
   @override
@@ -17369,6 +17374,20 @@ class L10nZh extends L10n {
 
   @override
   String get shellRuntimeAlmostDone => '马上就好';
+
+  @override
+  String get shellRuntimeLayerBase => '正在下载系统底座';
+
+  @override
+  String get shellRuntimeLayerNode => '正在下载 Node.js';
+
+  @override
+  String get shellRuntimeLayerEngine => '正在下载 DSH';
+
+  @override
+  String shellRuntimeElapsed(String count) {
+    return '已用 $count';
+  }
 
   @override
   String shellRuntimeSecondsRemaining(int count) {

@@ -49,7 +49,7 @@ void main() {
     await frames(tester, 10);
 
     // build 标记（确认跑的是新代码路径）
-    expect(find.text('build v3r23'), findsOneWidget);
+    expect(find.text('build v3r24'), findsOneWidget);
 
     final reprobe = find.text('重新探测');
     final start = find.text('开始下载');

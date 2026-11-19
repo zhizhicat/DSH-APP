@@ -311,7 +311,7 @@ class _DownloadSourceStepPageState extends ConsumerState<DownloadSourceStepPage>
         ),
         // 构建标记：真机对版用（排"装的不是新包"的雷）。
         Text(
-          'build v3r23',
+          'build v3r24',
           style: Theme.of(context).textTheme.labelSmall?.copyWith(
               color: Theme.of(context).colorScheme.onSurfaceVariant),
         ),

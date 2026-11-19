@@ -467,12 +467,22 @@ class RuntimeStatusEvent extends RuntimeEvent {
 }
 
 class RuntimeProgressEvent extends RuntimeEvent {
-  const RuntimeProgressEvent({required this.step, required this.done, required this.total});
+  const RuntimeProgressEvent({required this.step, required this.done, required this.total, this.layer});
   final String step;
   final int done;
   final int total;
+  /// Which archive the "download" progress belongs to: base / node / engine.
+  /// Emitted as a separate "download-layer" step right before its bytes.
+  final String? layer;
 
   double get fraction => total <= 0 ? 0 : (done / total).clamp(0, 1).toDouble();
+
+  factory RuntimeProgressEvent.fromMap(Map<Object?, Object?> raw) => RuntimeProgressEvent(
+    step: raw['step'] as String,
+    done: (raw['done'] as num).toInt(),
+    total: (raw['total'] as num).toInt(),
+    layer: raw['layer'] as String?,
+  );
 }
 
 class RuntimeLogEntry {
@@ -865,6 +875,7 @@ class RuntimeBridge {
           step: raw['step'] as String? ?? 'extract',
           done: (raw['done'] as num?)?.toInt() ?? 0,
           total: (raw['total'] as num?)?.toInt() ?? 0,
+          layer: raw['layer'] as String?,
         );
       case 'logs':
         return RuntimeLogsEvent(_logEntries(raw['entries']));

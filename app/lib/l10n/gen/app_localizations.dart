@@ -31850,6 +31850,12 @@ abstract class L10n {
   /// **'正在下载运行环境（约 150 MB，仅此一次）'**
   String get shellRuntimeDownloading;
 
+  /// No description provided for @shellRuntimeDownloadingSize.
+  ///
+  /// In zh, this message translates to:
+  /// **'正在下载运行环境（约 {mb} MB，仅此一次）'**
+  String shellRuntimeDownloadingSize(int mb);
+
   /// No description provided for @shellRuntimeContinuing.
   ///
   /// In zh, this message translates to:
@@ -31891,6 +31897,30 @@ abstract class L10n {
   /// In zh, this message translates to:
   /// **'马上就好'**
   String get shellRuntimeAlmostDone;
+
+  /// No description provided for @shellRuntimeLayerBase.
+  ///
+  /// In zh, this message translates to:
+  /// **'正在下载系统底座'**
+  String get shellRuntimeLayerBase;
+
+  /// No description provided for @shellRuntimeLayerNode.
+  ///
+  /// In zh, this message translates to:
+  /// **'正在下载 Node.js'**
+  String get shellRuntimeLayerNode;
+
+  /// No description provided for @shellRuntimeLayerEngine.
+  ///
+  /// In zh, this message translates to:
+  /// **'正在下载 DSH'**
+  String get shellRuntimeLayerEngine;
+
+  /// No description provided for @shellRuntimeElapsed.
+  ///
+  /// In zh, this message translates to:
+  /// **'已用 {count}'**
+  String shellRuntimeElapsed(String count);
 
   /// No description provided for @shellRuntimeSecondsRemaining.
   ///

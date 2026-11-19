@@ -192,65 +192,68 @@ final setupRuntimeProvider = Provider<SetupRuntime>(
 /// progress report this provider saw; null until there is enough to go on.
 /// One estimate for every place that shows the unpack, so they agree.
 class InstallEtaController extends Notifier<Duration?> {
+  /// 已用时间(秒表,从 0 起走)而非"约剩多少":剩余预估在三层逐层揭示总量时
+  /// 必然跳变(第一层下完才知道总量),用户看着像 bug(2026-11-19 反馈)。
+  /// elapsed 只增不减,任何速度下都单调可信。
   DateTime? _t0;
-  double _f0 = 0;
+  Timer? _ticker;
 
   @override
   Duration? build() {
     ref.listen(localRuntimeProvider.select((s) => s.progress), (_, next) => _track(next));
-    // A new unpack (a retry) starts its own samples.
+    // A new unpack (a retry) starts its own stopwatch.
     ref.listen(localRuntimeProvider.select((s) => s.status.phase == RuntimePhase.installing), (was, now) {
       if (now && was == false) _reset();
     });
+    ref.onDispose(() => _ticker?.cancel());
     return null;
   }
 
   void _reset() {
+    _ticker?.cancel();
+    _ticker = null;
     _t0 = null;
-    _f0 = 0;
     state = null;
   }
 
   void _track(RuntimeProgressEvent? progress) {
     if (progress == null) return;
-    final now = DateTime.now();
-    final f = progress.fraction;
     if (_t0 == null) {
-      _t0 = now;
-      _f0 = f;
-      return;
+      _t0 = DateTime.now();
+      state = Duration.zero;
+      _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
+        if (_t0 != null) state = DateTime.now().difference(_t0!);
+      });
     }
-    final elapsed = now.difference(_t0!);
-    final gained = f - _f0;
-    if (gained < 0.04 || elapsed < const Duration(seconds: 3)) return;
-    final perUnit = elapsed.inMilliseconds / gained;
-    final next = Duration(milliseconds: (perUnit * (1 - f)).round());
-    // Smooth the estimate so it doesn't jitter with each chunk.
-    final eta = state;
-    state = eta == null
-        ? next
-        : Duration(milliseconds: (eta.inMilliseconds * 0.6 + next.inMilliseconds * 0.4).round());
   }
 }
 
 final installEtaProvider = NotifierProvider<InstallEtaController, Duration?>(InstallEtaController.new);
 
-/// 「48 / 120 MB · 约 30 秒」: what is under the unpack's progress.
+/// 「正在下载 DSH · 48 / 124 MB · 已用 1 分 12 秒」: what is under the unpack's
+/// progress. Layer line shows which of the three archives is in flight (totals
+/// reveal themselves archive by archive — without the name, "49 → 203 MB"
+/// reads like a bug, 2026-11-19 反馈). Time is a stopwatch from zero, not a
+/// remaining estimate.
 String? installMetaLine(L10n l10n, RuntimeProgressEvent? progress, Duration? eta) {
   if (progress == null) return null;
   String mb(int bytes) => (bytes / (1024 * 1024)).toStringAsFixed(0);
   final size = progress.total > 0 ? '${mb(progress.done)} / ${mb(progress.total)} MB' : null;
-  final String? remaining;
-  if (eta == null) {
-    remaining = null;
-  } else if (eta.inSeconds < 5) {
-    remaining = l10n.shellRuntimeAlmostDone;
-  } else if (eta.inSeconds < 60) {
-    remaining = l10n.shellRuntimeSecondsRemaining((eta.inSeconds / 5).ceil() * 5);
-  } else {
-    remaining = l10n.shellRuntimeMinutesRemaining((eta.inSeconds / 60).ceil());
+  final String? layerName = switch (progress.step) {
+    'download' => switch (progress.layer) {
+        'base' => l10n.shellRuntimeLayerBase,
+        'node' => l10n.shellRuntimeLayerNode,
+        'engine' => l10n.shellRuntimeLayerEngine,
+        _ => null,
+      },
+    _ => null,
+  };
+  String? clock;
+  if (eta != null) {
+    final m = eta.inMinutes, s = eta.inSeconds % 60;
+    clock = l10n.shellRuntimeElapsed(m > 0 ? '$m 分 $s 秒' : '$s 秒');
   }
-  final line = [?size, ?remaining].join(' · ');
+  final line = [?layerName, ?size, ?clock].join(' · ');
   return line.isEmpty ? null : line;
 }
 

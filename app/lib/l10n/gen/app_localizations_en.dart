@@ -18268,6 +18268,11 @@ class L10nEn extends L10n {
   String get shellRuntimeDownloading => 'Downloading the runtime (about 150 MB, one time)';
 
   @override
+  String shellRuntimeDownloadingSize(int mb) {
+    return 'Downloading the runtime (about $mb MB, one time)';
+  }
+
+  @override
   String get shellRuntimeContinuing => 'Continuing shortly';
 
   @override
@@ -18287,6 +18292,20 @@ class L10nEn extends L10n {
 
   @override
   String get shellRuntimeAlmostDone => 'Almost done';
+
+  @override
+  String get shellRuntimeLayerBase => 'Downloading the base system';
+
+  @override
+  String get shellRuntimeLayerNode => 'Downloading Node.js';
+
+  @override
+  String get shellRuntimeLayerEngine => 'Downloading DSH';
+
+  @override
+  String shellRuntimeElapsed(String count) {
+    return '$count elapsed';
+  }
 
   @override
   String shellRuntimeSecondsRemaining(int count) {

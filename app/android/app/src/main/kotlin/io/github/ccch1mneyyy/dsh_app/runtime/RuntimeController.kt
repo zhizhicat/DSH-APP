@@ -400,14 +400,20 @@ class RuntimeController private constructor(private val app: Context) : DshProce
                 // 直拉组装模式下进度必须跨文件累计：每个小文件(deb/node tar)
                 // 各自回调 done/total,不累计的话 UI 会显示"2/2MB → 4/4MB"
                 // 跳变(当前文件而非总量)。doneSoFar 在每个文件完成后累加。
+                // layer 跟随每次字节事件:三层总量逐层揭示,没有层名时
+                // "49MB → 203MB"的跳变像 bug(2026-11-19 用户反馈)。
+                val grandTotal = toDownload.sumOf { it.bytes }.let { if (it > 0) it else 0L }
                 var doneSoFar = 0L
+                var currentLayer: String? = null
                 fun emitDownload(done: Long, total: Long) = emit(mapOf(
                     "type" to "progress", "step" to "download",
+                    "layer" to currentLayer,
                     "done" to doneSoFar + done,
-                    "total" to if (total > 0) doneSoFar + total else 0L))
+                    "total" to if (grandTotal > 0) grandTotal else if (total > 0) doneSoFar + total else 0L))
                 for (archive in toDownload) {
                     val layer = layerOf(archive.asset)
                     val prefix = layerPrefix[layer] ?: fallback
+                    currentLayer = layer
                     // ubuntu-base 原生源:镜像站直拉 rootfs(SHA256SUMS 校验) + deb 增量包,
                     // 装机期由 dpkgBootstrap 在 rootfs 就位后自举 deb 闭包。
                     val baseDist = if (layer == "base")
