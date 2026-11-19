@@ -185,7 +185,8 @@ class RuntimePlugin :
                         val url = when {
                             src.kind == "node-dist" && nodeVersion != null ->
                                 LayerSources.nodeProbeUrl(src, nodeVersion.removePrefix("node-v"))
-                            src.kind == "ubuntu-base" -> src.distBase // 镜像站根,装什么探什么
+                            // ubuntu-base / debian-base: 探 distBase 根，装什么探什么。
+                            src.kind == "ubuntu-base" || src.kind == "debian-base" -> src.distBase
                             else -> src.prefix + channel.githubBase + channel.indexPath
                         }
                         result.success(LayerChannels.probe(url))

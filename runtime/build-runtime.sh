@@ -84,6 +84,13 @@ DEBIAN_LXC_MIRRORS="${DEBIAN_LXC_MIRRORS:-https://images.linuxcontainers.org/ima
 DEBIAN_LXC_MIRROR="${DEBIAN_LXC_MIRROR:-https://mirrors.tuna.tsinghua.edu.cn/lxc-images/images/debian}"  # debian BASE（legacy 单镜像覆盖）
 DEBIAN_ARCHIVE="https://mirrors.tuna.tsinghua.edu.cn/debian"                      # debian BASE: one pool serves both architectures
 DEBIAN_SECURITY="https://mirrors.tuna.tsinghua.edu.cn/debian-security"            # debian security updates live in a separate pool
+# debian BASE rootfs: debuerreotype (docker-debian-artifacts, 与 kelivo 同源)。
+# 产物只此一处:doi-janky jenkins 的构件(会轮转),git dist 分支只存 sha256。
+# build#214 + lastSuccessfulBuild 双镜像都验同一 sha;上游轮转后 pin 会响亮失配,
+# 届时照 LXC 换日期的老规矩换 build 号即可。装机直拉的 rootfs 由 export_deltas
+# 以 base-rootfs-debian-<v>-<abi>.tar.xz 之名重发布到我们自己的 release(镜像恒定)。
+DEBIAN_DEBUE_JOB="https://doi-janky.infosiftr.net/job/tianon/job/debuerreotype/job/arm64v8"
+DEBIAN_DEBUE_BUILD="${DEBIAN_DEBUE_BUILD:-214}"
 UBUNTU_ARCHIVE_AMD64="https://mirrors.tuna.tsinghua.edu.cn/ubuntu"        # InRelease verified with gpgv
 UBUNTU_ARCHIVE_ARM64="https://mirrors.tuna.tsinghua.edu.cn/ubuntu-ports"
 UBUNTU_DEB_FALLBACK="https://launchpad.net/ubuntu/+archive/primary/+files"
@@ -98,6 +105,9 @@ declare -A PIN=(
   # debian LXC rootfs (sha256 computed at pin time; lxc-images publishes no SHA256SUMS, so these are mandatory)
   [debian-rootfs-12-20261117_05:24-arm64.tar.xz]=125416b51b1272db7abd932bc7cc5f286fd29a190cb5a1b18460500f5448d5fc
   [debian-rootfs-13-20261117_05:24-arm64.tar.xz]=6a5cc45b732de17e4ae1c90097694d01cba7fb0740208ba7fea403703b70a582
+  # debian debuerreotype rootfs (sha256 与 dist-arm64v8 分支和 jenkins 构件旁的 .sha256 三方核对一致, 2026-11-19)
+  [debian-rootfs-debuerreotype-12-arm64.tar.xz]=b054be256d2b0c9e4d8c973bfafb2d89899f30c735bbf0f0e08db6bfc5728851
+  [debian-rootfs-debuerreotype-13-arm64.tar.xz]=ea5b2e1a47bd2573fe42b902d6cb87787dcf551849b22322bc4d262ff4c2d3f3
   [node-v24.22.1-linux-arm64.tar.xz]=dbabf7a1cbf947e6059ffad2c27b80041db97dea1e553b62afdee7f13fca336e
   [node-v24.22.1-linux-x64.tar.xz]=6c172a9ab6718f7b801fb5a7bd486af2ee5e32758086a04b84fcce2aa77095e6
   [proot_5.1.107.102_aarch64.deb]=10a394b585c2fc2b2c8502544f4e5f1be581dc8bfff79e8ba62f16207423e030
@@ -176,16 +186,19 @@ rootfs_base() {  # $1 = distro arch (arm64|amd64); echoes path to the verified b
   esac
 }
 
-debian_base() {  # LXC images rootfs; no upstream SHA256SUMS exists, so a PIN entry is mandatory
+debian_base() {  # debuerreotype rootfs (docker-debian-artifacts); sha256 pinned below after
+                  # triple-checking the dist-arm64v8 branch against the jenkins artifact
   local arch="$1"
-  local name="debian-rootfs-$BASE_VER-$LXC_DATE-$arch.tar.xz"
+  local name="debian-rootfs-debuerreotype-$BASE_VER-$arch.tar.xz"
   local dir="$CACHE/debian/$BASE_VER"
   local pin; pin="$(pin_of "$name")"
-  [[ -n "$pin" ]] || die "no sha256 PIN for $name — lxc-images publishes no checksums; compute and add one"
+  [[ -n "$pin" ]] || die "no sha256 PIN for $name — verify against dist-arm64v8/$APT_CODENAME/rootfs.tar.xz.sha256 and add one"
   local codename; codename="$APT_CODENAME"
-  local -a lurls=()
-  for m in $DEBIAN_LXC_MIRRORS; do lurls+=("$m/$codename/$arch/default/$LXC_DATE/rootfs.tar.xz"); done
-  fetch "${lurls[0]}" "$dir/$name" "$pin" "${lurls[@]:1}"
+  local -a durls=(
+    "$DEBIAN_DEBUE_JOB/$DEBIAN_DEBUE_BUILD/artifact/$codename/rootfs.tar.xz"
+    "$DEBIAN_DEBUE_JOB/lastSuccessfulBuild/artifact/$codename/rootfs.tar.xz"
+  )
+  fetch "${durls[0]}" "$dir/$name" "$pin" "${durls[@]:1}"
   printf '%s' "$dir/$name"
 }
 
@@ -390,7 +403,17 @@ export_deltas() {  # v1.5 compose 块素材：原始物 sha+镜像组、增量�
   local -a mirrors=()
   local rel=""
   if [[ "$DISTRO" == debian ]]; then
-    for m in $DEBIAN_LXC_MIRRORS; do mirrors+=("$m/$APT_CODENAME/${ubuntu_arch:-arm64}/default/$LXC_DATE/rootfs.tar.xz"); done
+    # debuerreotype rootfs 唯一活源是会轮转的 jenkins,装机直拉不能指向它;
+    # 把构建期已验 sha 的 rootfs 重发布为本仓库 release 资产(恒定字节),镜像组
+    # = gh 代理链,与 fat 层同源。资产由发布步骤随 assets 目录一并上传。
+    local rasset="base-rootfs-${BASE}-${abi}.tar.xz"
+    local slug="${GH_REPO_SLUG:-zhizhicat/DSH-APP}"
+    rel="https://github.com/${slug}/releases/download/runtime-layers/${rasset}"
+    local p
+    for p in "https://ghfast.top/" "https://gh-proxy.com/" "https://gh-proxy.org/" ""; do
+      mirrors+=("${p}${rel}")
+    done
+    cp -f "$base" "$assets/$rasset"
   else
     local fname; fname="$(basename "$base")"
     for m in $UBUNTU_CDIMAGE_MIRRORS; do mirrors+=("$m/${UBUNTU_VERSION%.*}/release/$fname"); done

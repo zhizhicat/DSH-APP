@@ -35,8 +35,12 @@ internal object LayerSources {
         LayerSource("github", "GitHub 直连", "gh-mirror", prefix = ""),
     )
 
-    /** rootfs：gh 四镜像 + ubuntu-base 原生源（镜像站直拉 rootfs+deb 增量组装） */
+    /** rootfs：gh 四镜像 + ubuntu-base 原生源（镜像站直拉 rootfs+deb 增量组装） +
+     *  debuerreotype 原生源（debian rootfs 直拉,镜像组在 compose 里指向本仓库
+     *  release 的重发布资产,fat 层与直拉组装同源,2026-11-19） */
     val base: List<LayerSource> = ghMirrors + listOf(
+        LayerSource("debuerreotype", "发行版原生 rootfs · 镜像直拉", "debian-base",
+            distBase = "https://ghfast.top"),
         LayerSource("tuna-cdimage", "清华 TUNA · ubuntu-base", "ubuntu-base",
             distBase = "https://mirrors.tuna.tsinghua.edu.cn/ubuntu-cdimage/ubuntu-base/releases", probePath = ""),
         LayerSource("ubuntu-cdimage", "Ubuntu 官方 cdimage", "ubuntu-base",

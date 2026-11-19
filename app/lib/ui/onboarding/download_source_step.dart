@@ -211,14 +211,18 @@ class _DownloadSourceStepPageState extends ConsumerState<DownloadSourceStepPage>
     return index == null;
   }
 
-  /// 底座源按所选底座过滤：ubuntu-base 原生源只载 ubuntu rootfs
-  /// （Debian 官方不发布 rootfs tarball，直拉路线不存在），选 debian 时
-  /// 必须收进 gh 镜像——否则"Ubuntu 官方 cdimage"还亮着且可选中，
-  /// 装机会走 ubuntu 直拉路（2026-11-19 截图实锤：debian-12 + 高亮 cdimage 源）。
+  /// 底座源按所选底座过滤：原生源与底座一一对应——
+  /// ubuntu → ubuntu-base（cdimage/ubuntu-cdimage 镜像直拉），
+  /// debian → debian-base（debuerreotype rootfs，compose 镜像组指向本仓库
+  /// release 的重发布资产）。跨底座显示会误导（2026-11-19 截图实锤：
+  /// debian-12 + 高亮「Ubuntu 官方 cdimage」）且选错装机路。
   List<RuntimeSourceInfo> _basePool() {
     final pool = _layerSources['base'] ?? _sources;
     final base = _choice?.base;
-    if (base == null || base.startsWith('ubuntu-')) return pool;
+    if (base == null) return pool;
+    if (base.startsWith('ubuntu-')) {
+      return pool.where((s) => s.kind != 'debian-base').toList();
+    }
     return pool.where((s) => s.kind != 'ubuntu-base').toList();
   }
 

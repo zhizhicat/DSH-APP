@@ -414,11 +414,12 @@ class RuntimeController private constructor(private val app: Context) : DshProce
                     val layer = layerOf(archive.asset)
                     val prefix = layerPrefix[layer] ?: fallback
                     currentLayer = layer
-                    // ubuntu-base 原生源:镜像站直拉 rootfs(SHA256SUMS 校验) + deb 增量包,
+                    // 原生源(ubuntu-base/debian-base):镜像站直拉 rootfs(SHA256SUMS 校验) + deb 增量包,
                     // 装机期由 dpkgBootstrap 在 rootfs 就位后自举 deb 闭包。
                     val baseDist = if (layer == "base")
                         LayerSources.find("base", sourceId) else null
-                    if (baseDist?.kind == "ubuntu-base") {
+                    if (baseDist != null &&
+                        (baseDist.kind == "ubuntu-base" || baseDist.kind == "debian-base")) {
                         val idxObj = JSONObject(File(downloads, "layers-index.json").readText())
                         val compose = idxObj.optJSONObject("compose")
                             ?: throw IOException("layers index carries no compose block; re-release layers first")
@@ -432,7 +433,7 @@ class RuntimeController private constructor(private val app: Context) : DshProce
                             .map { rootfs.getJSONArray("mirrors").getString(it - 1) }
                         val host = java.net.URI(baseDist.distBase).host ?: ""
                         val url = mirrors.firstOrNull { it.contains(host) } ?: mirrors.first()
-                        log("[dsh-app] base layer via ${baseDist.id} (ubuntu-base, $url)", "system")
+                        log("[dsh-app] base layer via ${baseDist.id} (${baseDist.kind}, $url)", "system")
                         m = m.copy(archives = m.archives.map {
                             if (it.asset == archive.asset) it.copy(sha256 = sha) else it
                         })
