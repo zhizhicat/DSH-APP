@@ -155,9 +155,9 @@ void main() {
       expect(remote, 0);
       await tester.pump(const Duration(milliseconds: 600));
       expect(find.text('DSH 在哪里运行？'), findsNothing);
-      // 下载页降噪(2026-11-19):标题与小字行都收起,进度环+meta行说明一切。
-      expect(find.text('正在准备运行环境'), findsNothing);
-      expect(find.byKey(const ValueKey('pct')), findsOneWidget);
+      // 该 rig 的 mock 不推进 phase,停在 waiting 态——标题按设计保留;
+      // installing 态的降噪断言见「says what it costs」组(那个 rig 会置 installing)。
+      expect(find.text('正在准备运行环境'), findsOneWidget);
     });
 
     testWidgets('the two cards are the same size, glyph and mark equally inset', (tester) async {
