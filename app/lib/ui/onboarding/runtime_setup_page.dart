@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -191,20 +190,17 @@ class _RuntimeSetupPageState extends ConsumerState<RuntimeSetupPage> {
       _SetupView.failed => l10n.shellRuntimeIncomplete,
     };
     final body = switch (view) {
-      // 三层总量逐层揭示,写死的"约 150 MB"在 203MB 的今天已经说谎
-      // (2026-11-19 反馈):总量已知时报实数,未知才回落到旧文案。
-      _SetupView.installing when state.progress?.step == 'download' => state.progress!.total > 0
-          ? l10n.shellRuntimeDownloadingSize((state.progress!.total / (1024 * 1024)).round())
-          : l10n.shellRuntimeDownloading,
-      _SetupView.waiting || _SetupView.installing || _SetupView.choose when widget.waiting => l10n.setupWaitingBody,
+      // 下载页降噪（2026-11-19 反馈）：安装进行中标题下不再铺小字——
+      // 环形进度+百分比已说明一切，层名/兆数/耗时走「查看日志」，
+      // 页面只留底部「完成时会通知你」一行。
+      _SetupView.installing => null,
+      _SetupView.waiting || _SetupView.choose when widget.waiting => l10n.setupWaitingBody,
       _SetupView.waiting ||
-      _SetupView.installing ||
       _SetupView.choose => _upgrade ? l10n.shellRuntimeFilesKept : l10n.shellRuntimeFirstSetup,
       _SetupView.done => l10n.shellRuntimeContinuing,
       _SetupView.failed when state.status.keepFailed => l10n.shellRuntimeRestoreFailed,
       _SetupView.failed => humanizeRuntimeError(state.status.error) ?? l10n.shellRuntimeExtractFailed,
     };
-    final meta = view == _SetupView.installing ? installMetaLine(l10n, progress, ref.watch(installEtaProvider)) : null;
     // Set up and waiting: when a notification can say it's done, say so.
     final notifies =
         widget.waiting &&
@@ -248,27 +244,18 @@ class _RuntimeSetupPageState extends ConsumerState<RuntimeSetupPage> {
           duration: AppMotion.of(context, AppMotion.standard),
           child: Text(title, key: ValueKey(title), textAlign: TextAlign.center, style: theme.textTheme.headlineSmall),
         ),
-        const SizedBox(height: 6),
-        AnimatedSwitcher(
-          duration: AppMotion.of(context, AppMotion.standard),
-          child: Text(
-            body,
-            key: ValueKey(body),
-            textAlign: TextAlign.center,
-            style: theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
+        if (body != null) ...[
+          const SizedBox(height: 6),
+          AnimatedSwitcher(
+            duration: AppMotion.of(context, AppMotion.standard),
+            child: Text(
+              body,
+              key: ValueKey(body),
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
+            ),
           ),
-        ),
-        const SizedBox(height: 8),
-        SizedBox(
-          height: math.max(20, MediaQuery.textScalerOf(context).scale(12) * 1.5),
-          child: meta == null
-              ? null
-              : Text(
-                  meta,
-                  textAlign: TextAlign.center,
-                  style: AppType.tabular(theme.textTheme.bodySmall!.copyWith(color: colors.textTertiary)),
-                ),
-        ),
+        ],
         const Spacer(flex: 2),
         if (view == _SetupView.failed) ...[
           Row(
