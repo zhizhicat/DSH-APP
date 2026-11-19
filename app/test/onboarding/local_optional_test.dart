@@ -155,7 +155,9 @@ void main() {
       expect(remote, 0);
       await tester.pump(const Duration(milliseconds: 600));
       expect(find.text('DSH 在哪里运行？'), findsNothing);
-      expect(find.text('正在准备运行环境'), findsOneWidget);
+      // 下载页降噪(2026-11-19):标题与小字行都收起,进度环+meta行说明一切。
+      expect(find.text('正在准备运行环境'), findsNothing);
+      expect(find.byKey(const ValueKey('pct')), findsOneWidget);
     });
 
     testWidgets('the two cards are the same size, glyph and mark equally inset', (tester) async {
@@ -459,7 +461,9 @@ void main() {
       await tester.tap(find.widgetWithText(FilledButton, '安装'));
       await _frames(tester, 3);
       expect(runtime.calls, ['install']);
-      expect(find.text('正在准备运行环境'), findsOneWidget);
+      // 下载页降噪(2026-11-19):标题与小字行都收起,进度环+meta行说明一切。
+      expect(find.text('正在准备运行环境'), findsNothing);
+      expect(find.byKey(const ValueKey('pct')), findsOneWidget);
 
       runtime.emit(stoppedStatus);
       await _frames(tester, 20);
