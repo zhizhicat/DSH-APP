@@ -67,6 +67,8 @@ def main():
     ap.add_argument("--index", help="layers-index.json（读取 base/node 层描述）")
     ap.add_argument("--engine-version")
     ap.add_argument("--compose-dir", help="build_abi 的 export_deltas 产物目录（base-*/base-debs-*/engine-adapter-* json）")
+    ap.add_argument("--debs-variants", default="",
+                    help="逗号分隔，直拉要带 deb 闭包自举的变体（默认空=全裸底座，只拉 rootfs）")
     ap.add_argument("--node-mirrors", help="空格分隔的 node 发布镜像组（附加 /v<ver>/<file>）")
     ap.add_argument("--out", required=True)
     args = ap.parse_args()
@@ -103,14 +105,14 @@ def main():
     # compose-dir 聚合：export_deltas 的 base 镜像组/sha、增量包描述、adapter 包
     if args.compose_dir:
         import glob, os
+        # 直拉默认裸底座：不导出 debs 键（App 端 optJSONObject("debs") 缺失即跳过
+        # dpkg 自举，只拉 rootfs）。fat 层（gh 镜像路线）不受影响，工具由 dsh
+        # 运行期按需 apt install。要恢复直拉自举时显式传 --debs-variants。
+        # 两遍循环修顺序 bug：sorted() 下 base-debs-* 排在 base-ubuntu-* 之前，
+        # debs 键先写会被 rootfs 的整块赋值覆盖（2026-11-19 ubuntu 条目实证）。
+        debs_vars = {v.strip() for v in args.debs_variants.split(",") if v.strip()}
         for bf in sorted(glob.glob(os.path.join(args.compose_dir, "base-*.json"))):
             if "debs" in os.path.basename(bf):
-                # deb+python 增量包描述并入同变体（App 端 ubuntu-base 组装要校验它）
-                debdoc = json.load(open(bf))
-                dvar = os.path.basename(bf)[len("base-debs-"):-len(".json")]
-                compose.setdefault("baseVariants", {}).setdefault(dvar, {})["debs"] = {
-                    "asset": debdoc.get("asset"), "sha256": debdoc.get("sha256"),
-                    "bytes": debdoc.get("bytes")}
                 continue
             doc = json.load(open(bf))
             variant = os.path.basename(bf)[len("base-"):-len(".json")]
@@ -118,8 +120,14 @@ def main():
             if args.node_mirrors and "node" not in compose:
                 compose["node"] = doc["node"]
         for bf in sorted(glob.glob(os.path.join(args.compose_dir, "base-debs-*.json"))):
-            variant = os.path.basename(bf)[len("base-debs-"):-len(".json")]
-            compose.setdefault("baseVariants", {}).setdefault(variant, {})["debsDelta"] = json.load(open(bf))
+            dvar = os.path.basename(bf)[len("base-debs-"):-len(".json")]
+            if dvar not in debs_vars:
+                continue
+            debdoc = json.load(open(bf))
+            compose.setdefault("baseVariants", {}).setdefault(dvar, {})["debs"] = {
+                "asset": debdoc.get("asset"), "sha256": debdoc.get("sha256"),
+                "bytes": debdoc.get("bytes")}
+            compose.setdefault("baseVariants", {}).setdefault(dvar, {})["debsDelta"] = json.load(open(bf))
         for bf in sorted(glob.glob(os.path.join(args.compose_dir, "engine-adapter-*.json"))):
             engine["adapter"] = json.load(open(bf))
         if args.node_mirrors and "node" in compose:
