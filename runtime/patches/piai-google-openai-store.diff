@@ -1,6 +1,6 @@
 --- a/node_modules/@earendil-works/pi-ai/dist/api/openai-completions.js
 +++ b/node_modules/@earendil-works/pi-ai/dist/api/openai-completions.js
-@@ -1230,6 +1230,18 @@
+@@ -1233,6 +1233,18 @@
      const isAntLing = provider === "ant-ling" || baseUrl.includes("api.ant-ling.com");
      const isCerebras = provider === "cerebras" || baseUrl.includes("cerebras.ai");
      const isDeepSeek = provider === "deepseek" || baseUrl.toLowerCase().includes("deepseek.com");
@@ -19,7 +19,7 @@
      const isNonStandard = isNvidia ||
          isCerebras ||
          provider === "xai" ||
-@@ -1256,7 +1268,7 @@
+@@ -1259,7 +1271,7 @@
      const isOpenRouterDeveloperRoleModel = isOpenRouter && (model.id.startsWith("anthropic/") || model.id.startsWith("openai/"));
      const cacheControlFormat = provider === "openrouter" && model.id.startsWith("anthropic/") ? "anthropic" : undefined;
      return {

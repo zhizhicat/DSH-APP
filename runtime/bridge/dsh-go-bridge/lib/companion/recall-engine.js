@@ -169,7 +169,8 @@ export async function createRecallEngineAdapter(ctx, { contexts } = {}) {
       const history = agent.session.toolHistory();
       return state.sessionId === agent.id && state.eligible && !agent.session.dshGoRecallHistory
         && agent.status === 'idle' && agent.phase.kind === 'idle' && agent.session.inheritedEventCount === 0
-        && agent.inbox.nextTurn.length === 0 && agent.inbox.nextStep.length === 0 && agent.inbox.claimed.length === 0
+        && agent.inbox.nextTurn.length === 0 && agent.inbox.nextStep.length === 0
+        && (agent.inbox.claimed?.length ?? (agent.inbox.hasPending === false ? 0 : 1)) === 0
         && agent.session.requestHeader() === undefined && history.tools.length === 0 && history.updates.length === 0;
     } catch { return false; }
   }

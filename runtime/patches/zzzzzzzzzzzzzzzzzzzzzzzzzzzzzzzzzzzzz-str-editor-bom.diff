@@ -1,6 +1,7 @@
 --- a/node_modules/@deepseek-ai/dsh-tool-str-replace-editor/lib/index.js
 +++ b/node_modules/@deepseek-ai/dsh-tool-str-replace-editor/lib/index.js
-@@ -159,4 +159,10 @@
+@@ -160,6 +160,12 @@
+ 	}, exec);
  	return `New file created successfully at: ${target.displayPath}`;
  }
 +// Restore only the original UTF-8 format marker omitted by readText.
@@ -10,8 +11,10 @@
 +	return bytes.length === 3 && bytes[0] === 239 && bytes[1] === 187 && bytes[2] === 191 ? "\uFEFF" : "";
 +}
  async function replaceInFile(ctx, policy, path, oldStr, newStr, exec) {
- 	if (newStr === null) throw new Error("Parameter `new_str` must be omitted or contain a string for command: str_replace");
-@@ -175,5 +181,6 @@
+ 	if (newStr === null) throw new ToolArgsError(["Parameter `new_str` must be omitted or contain a string for command: str_replace"]);
+ 	const sandboxPolicy = policy.resolve(exec);
+@@ -176,7 +182,8 @@
+ 	if (offsets.length > 1) throw new FsError(`No replacement was performed. Multiple occurrences of old_str \`${oldValue}\` in lines [${lineNumbersAt(before, offsets).join(", ")}]. Please ensure it is unique`, "FS_AMBIGUOUS_EDIT");
  	let outcome;
  	try {
 -		outcome = await ctx.fs.writeText(target, before.slice(0, offset) + newValue + before.slice(offset + oldValue.length), intent === void 0 ? {
@@ -19,15 +22,19 @@
 +		outcome = await ctx.fs.writeText(target, bom + before.slice(0, offset) + newValue + before.slice(offset + oldValue.length), intent === void 0 ? {
  			kind: "replaceIfVersion",
  			version: info.version
-@@ -199,5 +206,6 @@
+ 		} : {
+@@ -200,7 +207,8 @@
+ 	const intent = await ctx.waterfall("fs/edit-intent", target, exec, () => void 0);
  	const info = await statExisting(ctx, target, "insert", exec);
  	if (info.type !== "file") throw new FsError(`cannot insert into "${target.displayPath}": not a regular file`, "FS_NOT_REGULAR_FILE");
 -	const lines = (await ctx.fs.readText(target, exec.signal)).split("\n");
 +	const before = await ctx.fs.readText(target, exec.signal);
 +	const lines = before.split("\n");
- 	if (!Number.isInteger(insertLine) || insertLine < 0 || insertLine > lines.length) throw new Error(`Invalid \`insert_line\` parameter: ${insertLine}. It should be within the range of lines of the file: [0, ${lines.length}]`);
+ 	if (!Number.isInteger(insertLine) || insertLine < 0 || insertLine > lines.length) throw new ToolArgsError([`Invalid \`insert_line\` parameter: ${insertLine}. It should be within the range of lines of the file: [0, ${lines.length}]`]);
  	const after = [
-@@ -215,5 +223,6 @@
+ 		...lines.slice(0, insertLine),
+@@ -216,7 +224,8 @@
+ 	};
  	let outcome;
  	try {
 -		outcome = await ctx.fs.writeText(target, after, expected, exec.signal, sandboxPolicy);
@@ -35,3 +42,4 @@
 +		outcome = await ctx.fs.writeText(target, bom + after, expected, exec.signal, sandboxPolicy);
  	} catch (error) {
  		throw policy.mapError(error, sandboxPolicy);
+ 	}

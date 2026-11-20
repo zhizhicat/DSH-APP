@@ -8,7 +8,7 @@
  import { existsSync, readFileSync } from 'node:fs';
  import { mkdir, mkdtemp, open, rm } from 'node:fs/promises';
  import { join, resolve } from 'node:path';
-@@ -423,15 +424,29 @@
+@@ -435,15 +436,29 @@
              }, options.idleTimeoutMs);
          };
          const collect = async (stream, kind) => {
@@ -21,7 +21,6 @@
 -                    await writes;
 -                    options.onOutput?.(bytes.toString('utf8'), kind);
 -                    append(bytes);
--                }
 +                try {
 +                    for await (const chunk of stream) {
 +                        armIdle();
@@ -31,7 +30,7 @@
 +                        options.onOutput?.(decoder.write(bytes), kind);
 +                        append(bytes);
 +                    }
-+                }
+                 }
 +                catch (error) {
 +                    // Finish the consumed prefix, but keep the failure that ended the read.
 +                    try {

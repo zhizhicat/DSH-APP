@@ -1,6 +1,6 @@
 --- a/node_modules/@earendil-works/pi-ai/dist/api/anthropic-messages.js
 +++ b/node_modules/@earendil-works/pi-ai/dist/api/anthropic-messages.js
-@@ -138,6 +138,24 @@
+@@ -143,6 +143,24 @@
  function shouldUseServerSideFallbackBeta(model) {
      return (model.compat?.allowedFallbackModels?.length ?? 0) > 0;
  }
@@ -25,7 +25,7 @@
  function getAnthropicCompat(model) {
      const isOpenRouter = model.provider === "openrouter" || model.baseUrl.includes("openrouter.ai");
      return {
-@@ -745,7 +763,7 @@
+@@ -942,7 +960,7 @@
      }
      // For models with adaptive thinking: use an effort level.
      // For older models: use budget-based thinking.
@@ -34,7 +34,7 @@
          const effort = mapThinkingLevelToEffort(model, options.reasoning);
          return stream(model, context, {
              ...base,
-@@ -862,7 +880,7 @@
+@@ -1059,7 +1077,7 @@
      if (model.reasoning &&
          options?.thinkingEnabled === true &&
          (options.interleavedThinking ?? true) &&
@@ -43,7 +43,7 @@
          features.push(INTERLEAVED_THINKING_BETA);
      }
      if (shouldUseServerSideFallbackBeta(model))
-@@ -978,7 +996,7 @@
+@@ -1181,7 +1199,7 @@
          // Default to "summarized" so Opus 4.7 and Mythos Preview behave like
          // older Claude 4 models (whose API default is also "summarized").
          const display = options.thinkingDisplay ?? "summarized";

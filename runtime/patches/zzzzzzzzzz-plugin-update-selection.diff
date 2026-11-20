@@ -1,20 +1,30 @@
 --- a/node_modules/@deepseek-ai/dsh-plugin-manager/lib/index.js
 +++ b/node_modules/@deepseek-ai/dsh-plugin-manager/lib/index.js
-@@ -2694,3 +2694,3 @@
+@@ -2771,10 +2771,11 @@
+ 				target,
+ 				error: managementError(error)
  			}));
 -			const installTarget = () => settled("install", spec, this.installBundle(spec, {
 +			const installTarget = (preserveSelection = false) => settled("install", spec, this.installBundle(spec, {
- 				saveExact: true,
-@@ -2698,2 +2698,3 @@
+ 				saveExact,
  				enabled,
+ 				expected: {
 +				...preserveSelection ? { preserveSelection: true } : {},
- 				...requestId === void 0 ? {} : { requestId }
-@@ -2706,3 +2707,3 @@
+ 					name,
+ 					version
+ 				},
+@@ -2787,7 +2788,7 @@
+ 					from,
+ 					to: version,
  					step: "install",
 -					result: await installTarget()
 +					result: await installTarget(true)
  				};
-@@ -3031,3 +3032,7 @@
+ 			}
+ 			const unreachable = target.kind === "git" ? await this.gitHostUnreachable(spec) : void 0;
+@@ -3236,7 +3237,11 @@
+ 				result.target = name;
+ 				result.stage = "enable";
  				return this.configure(async () => {
 -					if (options?.enabled !== false) await this.selectBundle(name, true);
 +					// In-place updates retain the selection saved while registry checks were pending.
@@ -23,3 +33,5 @@
 +						: options?.enabled !== false;
 +					if (activate) await this.selectBundle(name, true);
  					if (Object.hasOwn(before, name) && this.ownerContext.get("hmr") === void 0) return;
+ 					const selected = bundleSelection(readProfileManifest("dsh", this.profile.dir)).includes(name);
+ 					Object.assign(result, await this.publishAndReload(selected ? this.bundleRows(name).map((row) => row.id) : []));

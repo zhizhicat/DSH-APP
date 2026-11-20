@@ -9,7 +9,7 @@
  }
  /**
  * Build the header line object from a {@link SessionHeader}.
-@@ -2621,8 +2621,8 @@
+@@ -2628,8 +2628,8 @@
  		const snapshots = [];
  		const listed = /* @__PURE__ */ new Set();
  		const pending = [...this.tracker.pendingEntries()];
@@ -20,7 +20,7 @@
  		const statted = settledValues(await settleLimited(this.listLimit, artifacts, async (artifact) => {
  			signal?.throwIfAborted();
  			try {
-@@ -2634,7 +2634,7 @@
+@@ -2641,7 +2641,7 @@
  				};
  			} catch (error) {
  				signal?.throwIfAborted();
@@ -29,7 +29,7 @@
  				return;
  			}
  		}));
-@@ -3065,11 +3065,11 @@
+@@ -3072,11 +3072,11 @@
  		}
  	}
  	/** Enumerate selected physical generations without interpreting their headers or bodies. */
@@ -43,7 +43,7 @@
  	}
  	/**
  	* Apply `task` to every Session directory through the shared listing
-@@ -3080,9 +3080,16 @@
+@@ -3087,9 +3087,16 @@
  	* @param signal - optional cancellation for directory listings.
  	* @returns per-directory results in traversal order.
  	*/
@@ -62,7 +62,7 @@
  		const dirs = [];
  		let projectFailure;
  		for (const outcome of projects) {
-@@ -3092,13 +3099,19 @@
+@@ -3099,13 +3106,19 @@
  			}
  			for (const dir of outcome.value) dirs.push(dir);
  		}
@@ -85,7 +85,7 @@
  		const entries = settledValues(await settleLimited(this.listLimit, paths, async (path) => {
  			signal?.throwIfAborted();
  			try {
-@@ -3107,7 +3120,10 @@
+@@ -3114,7 +3127,10 @@
  					revision: fileRevision(await stat(path, { bigint: true }))
  				};
  			} catch (error) {
@@ -97,7 +97,7 @@
  				return {
  					path,
  					revision: "missing"
-@@ -3119,34 +3135,48 @@
+@@ -3126,34 +3142,48 @@
  		signal?.throwIfAborted();
  		return hash.digest("hex");
  	}
@@ -112,11 +112,11 @@
 +		return true;
 +	}
 +	async listArtifacts(signal, tolerateUnreadable = false) {
- 		signal?.throwIfAborted();
--		const generations = await this.listGenerations(signal);
++		signal?.throwIfAborted();
 +		// A tolerant list must not prime the strict root-encoding check used by explicit operations.
 +		if (!tolerateUnreadable) await this.ensureRootEncoding();
-+		signal?.throwIfAborted();
+ 		signal?.throwIfAborted();
+-		const generations = await this.listGenerations(signal);
 +		const generations = await this.listGenerations(signal, tolerateUnreadable);
  		const headers = await settleLimited(this.listLimit, generations, async (selected) => {
  			signal?.throwIfAborted();
@@ -161,7 +161,7 @@
  			artifacts.push({
  				...metadata,
  				path: selected.sourcePath,
-@@ -3154,7 +3184,7 @@
+@@ -3161,7 +3191,7 @@
  			});
  		}
  		signal?.throwIfAborted();
@@ -170,7 +170,7 @@
  	}
  	/** Read and translate one selected generation header without inspecting its body. */
  	async readGenerationHeader(selected, expectedId, signal) {
-@@ -3176,7 +3206,7 @@
+@@ -3183,7 +3213,7 @@
  		}
  		assertNoRetiredHeaderFields(value);
  		const result = sessionFormatCatalog.readHeader(value);
@@ -179,7 +179,7 @@
  		if (result.status === "unsupported") {
  			const physicalId = String(value.id);
  			let reason = result.reason;
-@@ -3500,14 +3530,14 @@
+@@ -3518,14 +3548,14 @@
  	/** Reject metadata that does not identify the selected physical log. */
  	async assertStoredIdentity(path, storedVersion, meta, expectedId, signal) {
  		signal?.throwIfAborted();
@@ -190,15 +190,14 @@
  			expectedPath = generationLogPath(this.root, meta.cwd, meta.id, storedVersion, this.compression);
  		} catch (error) {
 -			throw new Error(`corrupt session log "${path}": header id cannot name a storage path`, { cause: error });
--		}
--		if (path !== expectedPath && !await this.sameFile(path, expectedPath, signal)) throw new Error(`corrupt session log "${path}": header id "${meta.id}" and cwd identify "${expectedPath}"`);
 +			throw new SessionPersistenceCorruptionError(`corrupt session log "${path}": header id cannot name a storage path`, { cause: error });
-+		}
+ 		}
+-		if (path !== expectedPath && !await this.sameFile(path, expectedPath, signal)) throw new Error(`corrupt session log "${path}": header id "${meta.id}" and cwd identify "${expectedPath}"`);
 +		if (path !== expectedPath && !await this.sameFile(path, expectedPath, signal)) throw new SessionPersistenceCorruptionError(`corrupt session log "${path}": header id "${meta.id}" and cwd identify "${expectedPath}"`);
  		signal?.throwIfAborted();
  	}
  	/** Validate a supported historical header against the selected source path. */
-@@ -3548,12 +3578,16 @@
+@@ -3567,12 +3597,16 @@
  		}
  	}
  	/** List session-owned directories and reject the obsolete flat-file layout. */
@@ -218,7 +217,7 @@
  		return entries.filter((entry) => entry.isDirectory()).map((entry) => join(project, entry.name));
  	}
  	/** Reject a root that already belongs to the other physical encoding. */
-@@ -3609,10 +3643,10 @@
+@@ -3628,10 +3662,10 @@
  		return this.compression === "zstd" ? "none" : "zstd";
  	}
  	encodingMismatch(path) {

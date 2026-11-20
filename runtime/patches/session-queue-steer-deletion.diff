@@ -1,6 +1,10 @@
 --- a/node_modules/@deepseek-ai/dsh-api-session-controller/lib/index.js
 +++ b/node_modules/@deepseek-ai/dsh-api-session-controller/lib/index.js
-@@ -955 +955,2 @@
--			case "steer":
-+			case "steer":
+@@ -1056,6 +1056,7 @@
+ 				break;
+ 			}
+ 			case "steer":
 +				this.ctx.get("sessionPersistence")?.dshGoDeletion?.assertAdmit(agent.id);
+ 				agent.inbox.remove(request.itemId);
+ 				agent.steer(message);
+ 				break;
