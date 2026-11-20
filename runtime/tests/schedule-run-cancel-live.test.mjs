@@ -10,12 +10,13 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
+import lockVersion from '../lib/lock-version.js';
 
 const prefix = process.env.DSH_TEST_PREFIX ?? process.env.DSH_PREFIX;
 assert.ok(prefix, 'set DSH_TEST_PREFIX to the locked, patched DSH npm prefix');
 const require = createRequire(join(resolve(prefix), 'package.json'));
 const cliPackage = require.resolve('@deepseek-ai/dsh/package.json');
-assert.equal(JSON.parse(await readFile(cliPackage)).version, '0.2.2-rc.1');
+assert.equal(JSON.parse(await readFile(cliPackage)).version, lockVersion());
 const cli = join(dirname(cliPackage), 'lib/bin.js');
 const observer = fileURLToPath(new URL('./fixtures/schedule-run-cancel-observer.mjs', import.meta.url));
 

@@ -7,10 +7,11 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import test from 'node:test';
+import lockVersion from '../lib/lock-version.js';
 
 assert.ok(process.env.DSH_TEST_PREFIX, 'set DSH_TEST_PREFIX to the locked rc4 npm prefix');
 const require = createRequire(join(resolve(process.env.DSH_TEST_PREFIX), 'package.json'));
-assert.equal(require('@deepseek-ai/dsh-credentials-local/package.json').version, '0.2.2-rc.1');
+assert.equal(require('@deepseek-ai/dsh-credentials-local/package.json').version, lockVersion());
 const { Context } = await import(pathToFileURL(require.resolve('@deepseek-ai/cordis')));
 const { LocalCredentialProvider, parseCredentialsDocument } = await import(pathToFileURL(require.resolve('@deepseek-ai/dsh-credentials-local')));
 const parse = text => parseCredentialsDocument(text, 'synthetic.credentials.yaml');

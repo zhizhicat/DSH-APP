@@ -3879,7 +3879,20 @@
         }
       },
       "0.2.2-rc.2": false,
-      "0.2.2-rc.3": false
+      "0.2.2-rc.3": {
+        "node_modules/@deepseek-ai/dsh-tool-bash/lib/index.js": {
+          "after": "f35872ab4fd97643f67323c9b42240e1be5413402831602b49fd1c59c05f2716",
+          "before": "8fb836a65eb633f85aa8b1b079fb306866e597fe8f4987c2205b5c4482df57de"
+        },
+        "node_modules/@deepseek-ai/dsh-tools/lib/index.js": {
+          "after": "c5116aac5a9bcdf1f9e79119b035d14e21d16e75e7efc1ab462c858d62e58364",
+          "before": "bf71a6ce1e95c5dfba06be7f69827bab19c5d2d9cf272875d92013ba2a8dadb0"
+        },
+        "node_modules/@deepseek-ai/dsh-tools/lib/pipeline.js": {
+          "after": "04b6d9239ac12d732d20bdc354f14b2e4b3e33ced5bc8d14e240063b4d49641f",
+          "before": "1435d300d5dfd045de6838d0a7040df522dbdcefaf95d3063e12dd4475e6fb0c"
+        }
+      }
     },
     "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz-phone-run-end.diff": {
       "0.2.2-rc.1": {

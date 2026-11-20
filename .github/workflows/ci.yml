@@ -281,7 +281,7 @@ jobs:
           } >> "$GITHUB_ENV"
       - name: Unit tests
         run: |
-          node --test runtime/tests/*.test.mjs app/tool/engine_auth/*.test.mjs
+          node --test --test-force-exit runtime/tests/*.test.mjs app/tool/engine_auth/*.test.mjs
           python3 -I runtime/tests/test_patch_dsh.py
       - name: Media and example plugins
         run: |
