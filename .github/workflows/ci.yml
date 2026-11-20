@@ -208,7 +208,9 @@ jobs:
     needs: changes
     if: needs.changes.outputs.runtime == 'true'
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    # 11-20: the merged phone/companion integration tests make the honest
+    # suite longer than 20 minutes on a 2-core runner. 40 leaves headroom.
+    timeout-minutes: 40
     env:
       UV_USE_IO_URING: 0
     steps:
