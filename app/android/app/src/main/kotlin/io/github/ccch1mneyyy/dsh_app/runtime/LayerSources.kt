@@ -28,37 +28,40 @@ internal object LayerSources {
         val experimental: Boolean = false,
     )
 
+    // 源排序与命名（2026-11-22 拍板）：GitHub 直连 → gh 加速 → 官方源 →
+    // 企业云 → 高校源；显示名去尾巴（ghfast.top · 国内加速 → ghfast），
+    // 高校统一「<校名>源」，企业云与官方保持原名。
     val ghMirrors = listOf(
-        LayerSource("ghfast", "ghfast.top · 国内加速", "gh-mirror", prefix = "https://ghfast.top/"),
-        LayerSource("ghproxy", "gh-proxy.com · 国内加速", "gh-mirror", prefix = "https://gh-proxy.com/"),
-        LayerSource("ghproxyorg", "gh-proxy.org · 国内加速", "gh-mirror", prefix = "https://gh-proxy.org/"),
-        LayerSource("github", "GitHub 直连", "gh-mirror", prefix = ""),
+        LayerSource("github", "GitHub", "gh-mirror", prefix = ""),
+        LayerSource("ghfast", "ghfast", "gh-mirror", prefix = "https://ghfast.top/"),
+        LayerSource("ghproxy", "gh-proxy", "gh-mirror", prefix = "https://gh-proxy.com/"),
+        LayerSource("ghproxyorg", "gh-proxy org", "gh-mirror", prefix = "https://gh-proxy.org/"),
     )
 
     /** rootfs：gh 四镜像 + ubuntu-base 原生源（镜像站直拉 rootfs+deb 增量组装） +
      *  debuerreotype 原生源（debian rootfs 直拉,镜像组在 compose 里指向本仓库
      *  release 的重发布资产,fat 层与直拉组装同源,2026-11-19） */
     val base: List<LayerSource> = ghMirrors + listOf(
-        LayerSource("debuerreotype", "发行版原生 rootfs · 镜像直拉", "debian-base",
-            distBase = "https://ghfast.top"),
-        LayerSource("tuna-cdimage", "清华 TUNA · ubuntu-base", "ubuntu-base",
-            distBase = "https://mirrors.tuna.tsinghua.edu.cn/ubuntu-cdimage/ubuntu-base/releases", probePath = ""),
-        LayerSource("ubuntu-cdimage", "Ubuntu 官方 cdimage", "ubuntu-base",
+        LayerSource("ubuntu-cdimage", "Ubuntu 官方", "ubuntu-base",
             distBase = "https://cdimage.ubuntu.com/ubuntu-base/releases", probePath = ""),
+        LayerSource("debuerreotype", "Debian 原生", "debian-base",
+            distBase = "https://ghfast.top"),
+        LayerSource("tuna-cdimage", "清华源", "ubuntu-base",
+            distBase = "https://mirrors.tuna.tsinghua.edu.cn/ubuntu-cdimage/ubuntu-base/releases", probePath = ""),
     )
 
     /** node：gh 四镜像 + 五个 node-dist 原生源（官方 tar 直拉，装机期重映射层布局） */
     val node: List<LayerSource> = ghMirrors + listOf(
+        LayerSource("nodejs", "Node.js 官方", "node-dist",
+            distBase = "https://nodejs.org/dist", probePath = "SHASUMS256.txt"),
         LayerSource("aliyun", "阿里云", "node-dist",
             distBase = "https://mirrors.aliyun.com/nodejs-release", probePath = "SHASUMS256.txt"),
         LayerSource("tencent", "腾讯云", "node-dist",
             distBase = "https://mirrors.cloud.tencent.com/nodejs-release", probePath = "SHASUMS256.txt"),
         LayerSource("huawei", "华为云", "node-dist",
             distBase = "https://mirrors.huaweicloud.com/nodejs", probePath = "SHASUMS256.txt"),
-        LayerSource("tuna", "清华 TUNA", "node-dist",
+        LayerSource("tuna", "清华源", "node-dist",
             distBase = "https://mirrors.tuna.tsinghua.edu.cn/nodejs-release", probePath = "SHASUMS256.txt"),
-        LayerSource("nodejs", "nodejs.org 官方", "node-dist",
-            distBase = "https://nodejs.org/dist", probePath = "SHASUMS256.txt"),
     )
 
     /** engine：gh 四镜像。适配层大包（含 154 补丁的构建产物）只在我们 release 上有，
