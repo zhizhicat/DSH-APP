@@ -1,6 +1,8 @@
 // Variant channels (schema 3), before 选择外观 on a noruntime first run:
-// pick a download mirror (probed live), then base / node / engine versions
-// from the layers index. 开始下载 hands over to the usual unpack flow.
+// pick base / node / engine versions from the layers index, then pick a
+// mirror for each. 纯自选：不替用户预选任何版本或源——选了版本才渲染该层
+// 源并自动探测一轮；换版本重渲染重探测；手动换源即时测一次。
+// 开始下载 hands over to the usual unpack flow.
 
 import 'dart:async';
 
@@ -41,16 +43,48 @@ class DownloadSourceStepPage extends ConsumerStatefulWidget {
 class _DownloadSourceStepPageState extends ConsumerState<DownloadSourceStepPage> {
   List<RuntimeSourceInfo> _sources = const [];
   Map<String, List<RuntimeSourceInfo>> _layerSources = const {};
-  /// v1.5 三层分源探测结果：'layer:sourceId' -> state。
-  final Map<String, _ProbeState> _layerProbes = {};
+  final _layerProbes = <String, _ProbeState>{};
   String? _layerChannelId;
-  String? _sourceId;
-  String? _nodeSourceId;
-  String? _engineSourceId;
   LayersIndex? _index;
-  LayersChoice? _choice;
   bool _indexLoading = false;
   String? _indexError;
+
+  // 内部取 index 用的源（含故障转移）。只有 _basePicked 后它才同时是
+  // 用户选定的底座源，否则不参与高亮与落盘。
+  String? _sourceId;
+  bool _basePicked = false;
+
+  // 纯自选：三层版本与 node/engine 源都由用户手选，初始全空。
+  String? _baseKey;
+  String? _nodeKey;
+  String? _engineKey;
+  String? _nodeSourceId;
+  String? _engineSourceId;
+
+  // 恢复 B：二次进入还原用户上次自己选的组合（不替选）。
+  LayersChoice? _savedChoice;
+  String? _savedBaseSourceId;
+
+  String? _layerKeyOf(String layer) => switch (layer) {
+        'base' => _baseKey,
+        'node' => _nodeKey,
+        'engine' => _engineKey,
+        _ => null,
+      };
+
+  /// 三层版本 + 三层源全选齐才算就绪（MB 行与开始下载共用）。
+  bool get _allReady =>
+      _choice != null &&
+      _sourceId != null &&
+      _basePicked &&
+      _nodeSourceId != null &&
+      _engineSourceId != null;
+
+  LayersChoice? get _choice {
+    final b = _baseKey, n = _nodeKey, e = _engineKey;
+    if (b == null || n == null || e == null) return null;
+    return LayersChoice(base: b, node: n, engine: e);
+  }
 
   @override
   void initState() {
@@ -58,24 +92,12 @@ class _DownloadSourceStepPageState extends ConsumerState<DownloadSourceStepPage>
     unawaited(_init());
   }
 
-  Future<String?> _layerChannel() async {
-    if (_layerChannelId != null) return _layerChannelId;
-    final channels = await ref.read(localRuntimeProvider.notifier).channels();
-    for (final c in channels) {
-      if (c.id.contains('layers')) {
-        _layerChannelId = c.id;
-        break;
-      }
-    }
-    return _layerChannelId;
-  }
-
   Future<void> _init() async {
-    final controller = ref.read(localRuntimeProvider.notifier);
-    final sources = await controller.channelSources();
+    final runtime = ref.read(localRuntimeProvider.notifier);
+    final sources = await runtime.channelSources();
     Map<String, List<RuntimeSourceInfo>> layerSources = const {};
     try {
-      layerSources = await controller.layerSources();
+      layerSources = await runtime.layerSources();
     } catch (_) {/* 三层源池是 v1.5 新桥：旧原生回退到单源池 */}
     final channelId = await _layerChannel();
     if (!mounted) return;
@@ -84,40 +106,43 @@ class _DownloadSourceStepPageState extends ConsumerState<DownloadSourceStepPage>
       _layerSources = layerSources;
     });
     final saved = await LocalRuntimeController.loadVariantPrefs();
-    final sourceId = _sources.any((s) => s.id == saved.sourceId)
-        ? saved.sourceId
-        : (_sources.isEmpty ? null : _sources.first.id);
-    _nodeSourceId = _validLayerSource('node', saved.nodeSourceId) ??
-        _validLayerSource('node', sourceId);
-    _engineSourceId = _validLayerSource('engine', saved.engineSourceId) ??
-        _validLayerSource('engine', sourceId);
-    if (sourceId != null && channelId != null) {
-      unawaited(_selectSource(sourceId, saved.choice));
-    }
-
-    // 三层分源探测（gh 镜像三层可各选不同）。
-    for (final layer in const ['base', 'node', 'engine']) {
-      for (final src in _layerSources[layer] ?? const <RuntimeSourceInfo>[]) {
-        unawaited(_probeLayer(layer, src.id, nodeVersion: saved.choice?.node));
-      }
+    _savedChoice = saved.choice;
+    _savedBaseSourceId =
+        _sources.any((s) => s.id == saved.sourceId) ? saved.sourceId : null;
+    // 只还原用户上次自己选的（B），不做任何 fallback 预选。
+    _nodeSourceId = _validLayerSource('node', saved.nodeSourceId);
+    _engineSourceId = _validLayerSource('engine', saved.engineSourceId);
+    final fetchFrom = _savedBaseSourceId ??
+        (_sources.isEmpty ? null : _sources.first.id);
+    if (fetchFrom != null && channelId != null) {
+      unawaited(_selectSource(fetchFrom, _savedChoice));
     }
   }
 
   bool _reprobing = false;
 
-  /// 重新探测三层全部源(保留选择,清空旧结果让 chips 重新显示探测中)。
+  /// 重新探测已激活的层（选了版本的层）；index 拉不到时退化为重测底座池
+  /// （给换源重试做参考）。保留选择,清旧结果让 chips 重新显示探测中。
   Future<void> _reprobeAll() async {
     if (_reprobing) return;
+    final layers = _index == null
+        ? const ['base']
+        : ['base', 'node', 'engine'].where((l) => _layerKeyOf(l) != null).toList();
+    if (layers.isEmpty) return;
     setState(() {
       _reprobing = true;
-      _layerProbes.clear();
+      for (final l in layers) {
+        _layerProbes.removeWhere((k, v) => k.startsWith('$l:'));
+      }
     });
-    final nodeVersion = _choice?.node;
-    final layers = const ['base', 'node', 'engine'];
     final futures = <Future<void>>[];
     for (final layer in layers) {
-      for (final src in _layerSources[layer] ?? const <RuntimeSourceInfo>[]) {
-        futures.add(_probeLayer(layer, src.id, nodeVersion: nodeVersion));
+      final pool = layer == 'base'
+          ? _basePool()
+          : (_layerSources[layer] ?? const <RuntimeSourceInfo>[]);
+      for (final src in pool) {
+        futures.add(_probeLayer(layer, src.id,
+            nodeVersion: layer == 'node' ? _nodeKey : null));
       }
     }
     await Future.wait(futures);
@@ -141,8 +166,21 @@ class _DownloadSourceStepPageState extends ConsumerState<DownloadSourceStepPage>
     });
   }
 
+  Future<String?> _layerChannel() async {
+    final channelId = _layerChannelId;
+    if (channelId != null) return channelId;
+    final channels = await ref.read(localRuntimeProvider.notifier).channels();
+    for (final c in channels) {
+      if (c.id.contains('layers')) {
+        _layerChannelId = c.id;
+        break;
+      }
+    }
+    return _layerChannelId;
+  }
 
   /// 选源入口：失败时按剩余源自动故障转移（探测延迟低者优先，最多轮完）。
+  /// 全源轮完仍失败：给底座 chips 补一轮探测，供换源重试参考。
   Future<void> _selectSource(String sourceId, LayersChoice? preferred) async {
     final tried = <String>{sourceId};
     var current = sourceId;
@@ -150,10 +188,14 @@ class _DownloadSourceStepPageState extends ConsumerState<DownloadSourceStepPage>
       final failed = await _fetchIndexOnce(current, preferred);
       if (!failed) return;
       final next = _nextSourceAfter(current, tried);
-      if (next == null || !mounted) return;
+      if (next == null) {
+        if (mounted && _baseKey == null) _probeLayerOnce('base');
+        return;
+      }
+      if (!mounted) return;
       tried.add(next);
       current = next;
-      if (mounted) setState(() => _sourceId = next);
+      setState(() => _sourceId = next);
     }
   }
 
@@ -170,7 +212,8 @@ class _DownloadSourceStepPageState extends ConsumerState<DownloadSourceStepPage>
     return candidates.isEmpty ? null : candidates.first.id;
   }
 
-  /// 拉一次 index；返回 true=失败（可故障转移）。
+  /// 拉一次 index。成功时只恢复用户上次自己选的组合（B：不 defaultFor 替选），
+  /// 并对恢复出的活跃层各探测一轮。
   Future<bool> _fetchIndexOnce(String sourceId, LayersChoice? preferred) async {
     setState(() {
       _sourceId = sourceId;
@@ -180,7 +223,14 @@ class _DownloadSourceStepPageState extends ConsumerState<DownloadSourceStepPage>
     });
     final channelId = await _layerChannel();
     if (channelId == null) {
-      if (mounted) setState(() { _indexLoading = false; _indexError = context.l10n.setupSourceIndexFailed; });
+      if (!mounted) return true;
+      // 旧原生层没有 probeLayerSource：整页退回「索引失败」样态（chips 全挂起）。
+      setState(() {
+        _indexLoading = false;
+        _indexError = '${context.l10n.setupSourceIndexFailed}\nold runtime channel';
+        _baseKey = _nodeKey = _engineKey = null;
+        _basePicked = false;
+      });
       return true;
     }
     Object? indexError;
@@ -196,82 +246,29 @@ class _DownloadSourceStepPageState extends ConsumerState<DownloadSourceStepPage>
       _index = index;
       if (index == null) {
         _indexError = '${context.l10n.setupSourceIndexFailed}\n$indexError';
-        _choice = null;
+        _baseKey = _nodeKey = _engineKey = null;
+        _basePicked = false;
       } else {
         _indexError = null;
-        _choice = _validChoice(preferred, index) ?? LayersChoice.defaultFor(index);
-        // 保存过的组合可能带着「ubuntu 原生源 + debian 底座」（旧 bug 状态的
-        // 持久化复活）：源不在当前底座池里就回落到池里最优。
-        if (_sourceId != null && !_basePool().any((s) => s.id == _sourceId)) {
-          final next = _nextSourceAfter(_sourceId!, {_sourceId!});
-          if (next != null) _sourceId = next;
+        final restored = _validChoice(preferred, index);
+        _baseKey = restored?.base;
+        _nodeKey = restored?.node;
+        _engineKey = restored?.engine;
+        // 恢复 B：上次自己选的底座源仍在当前池内才还原为已选。
+        if (restored != null &&
+            _savedBaseSourceId != null &&
+            _basePool().any((s) => s.id == _savedBaseSourceId)) {
+          _sourceId = _savedBaseSourceId;
+          _basePicked = true;
         }
       }
     });
-    return index == null;
-  }
-
-  /// 底座源按所选底座过滤：原生源与底座一一对应——
-  /// ubuntu → ubuntu-base（cdimage/ubuntu-cdimage 镜像直拉），
-  /// debian → debian-base（debuerreotype rootfs，compose 镜像组指向本仓库
-  /// release 的重发布资产）。跨底座显示会误导（2026-11-19 截图实锤：
-  /// debian-12 + 高亮「Ubuntu 官方 cdimage」）且选错装机路。
-  List<RuntimeSourceInfo> _basePool() {
-    final pool = _layerSources['base'] ?? _sources;
-    final base = _choice?.base;
-    if (base == null) return pool;
-    if (base.startsWith('ubuntu-')) {
-      return pool.where((s) => s.kind != 'debian-base').toList();
-    }
-    return pool.where((s) => s.kind != 'ubuntu-base').toList();
-  }
-
-  /// Applies a layer pick and remembers it right away, so leaving mid-download
-  /// still resumes into the same selection (the download itself caches too).
-  void _pick(LayersChoice choice) {
-    final baseChanged = _choice?.base != choice.base;
-    setState(() => _choice = choice);
-    if (baseChanged && _sourceId != null && !_basePool().any((s) => s.id == _sourceId)) {
-      // 选中源随底座失效（ubuntu 原生源遇 debian）：回落到剩余源里最优。
-      final next = _nextSourceAfter(_sourceId!, {_sourceId!});
-      if (next != null) setState(() => _sourceId = next);
-    }
-    final sourceId = _sourceId;
-    if (sourceId != null) {
-      unawaited(LocalRuntimeController.saveVariantPrefs(
-        sourceId: sourceId,
-        choice: choice,
-        nodeSourceId: _nodeSourceId,
-        engineSourceId: _engineSourceId,
-      ));
-    }
-  }
-
-  void _pickLayerSource(String layer, String id) {
-    setState(() {
-      switch (layer) {
-        case 'node':
-          _nodeSourceId = id;
-        case 'engine':
-          _engineSourceId = id;
+    if (index != null) {
+      for (final layer in const ['base', 'node', 'engine']) {
+        if (_layerKeyOf(layer) != null) _probeLayerOnce(layer);
       }
-    });
-    final sourceId = _sourceId;
-    final choice = _choice;
-    if (sourceId != null && choice != null) {
-      unawaited(LocalRuntimeController.saveVariantPrefs(
-        sourceId: sourceId,
-        choice: choice,
-        nodeSourceId: _nodeSourceId,
-        engineSourceId: _engineSourceId,
-      ));
     }
-  }
-
-  /// 纯净版（-pure）双轨已于 2026-11-19 下线：上游跟随改为适配层重发
-  /// （154 补丁照打），引擎区只展示已适配的版本。
-  void _pickEngine(String key) {
-    _pick(LayersChoice(base: _choice!.base, node: _choice!.node, engine: key));
+    return index == null;
   }
 
   LayersChoice? _validChoice(LayersChoice? preferred, LayersIndex index) {
@@ -291,6 +288,95 @@ class _DownloadSourceStepPageState extends ConsumerState<DownloadSourceStepPage>
         index.engine.firstWhere((v) => v.key == choice.engine).bytes;
   }
 
+  /// 底座源按所选底座过滤：原生源与底座一一对应——
+  /// ubuntu → ubuntu-base（cdimage/ubuntu-cdimage 镜像直拉），
+  /// debian → debian-base（debuerreotype rootfs，compose 镜像组指向本仓库
+  /// release 的重发布资产）。跨底座显示会误导（2026-11-19 截图实锤：
+  /// debian-12 + 高亮「Ubuntu 官方 cdimage」）且选错装机路。
+  List<RuntimeSourceInfo> _basePool() {
+    final pool = _layerSources['base'] ?? _sources;
+    final base = _baseKey;
+    if (base == null) return pool;
+    if (base.startsWith('ubuntu-')) {
+      return pool.where((s) => s.kind != 'debian-base').toList();
+    }
+    return pool.where((s) => s.kind != 'ubuntu-base').toList();
+  }
+
+  void _probeLayerOnce(String layer) {
+    final pool = layer == 'base'
+        ? _basePool()
+        : (_layerSources[layer] ?? const <RuntimeSourceInfo>[]);
+    final nodeVersion = layer == 'node' ? _nodeKey : null;
+    for (final src in pool) {
+      unawaited(_probeLayer(layer, src.id, nodeVersion: nodeVersion));
+    }
+  }
+
+  /// 选版本：该层源重渲染 + 清旧探测重测一轮。base 跨族切换（ubuntu ↔
+  /// debian）池子不同：已选底座源失效清空，重选。选完即落盘（就绪条件
+  /// 齐了才真正写库），离开页面也能续回同一组合。
+  void _pickVariant(String layer, String key) {
+    setState(() {
+      switch (layer) {
+        case 'base':
+          final old = _baseKey;
+          _baseKey = key;
+          if (old != null &&
+              old.startsWith('ubuntu-') != key.startsWith('ubuntu-')) {
+            _sourceId = null;
+            _basePicked = false;
+          }
+        case 'node':
+          _nodeKey = key;
+        case 'engine':
+          _engineKey = key;
+      }
+      _layerProbes.removeWhere((k, v) => k.startsWith('$layer:'));
+    });
+    _probeLayerOnce(layer);
+    _savePrefs();
+  }
+
+  /// 手动选底座源：不再重拉 index（版本已在前）；即时探测该源一次。
+  void _pickBaseSource(String id) {
+    setState(() {
+      _sourceId = id;
+      _basePicked = true;
+    });
+    unawaited(_probeLayer('base', id));
+    _savePrefs();
+  }
+
+  /// 手动换 node/engine 源：即时探测该源一次（node 探测带版本）。
+  void _pickLayerSource(String layer, String id) {
+    setState(() {
+      switch (layer) {
+        case 'node':
+          _nodeSourceId = id;
+        case 'engine':
+          _engineSourceId = id;
+      }
+    });
+    unawaited(_probeLayer(layer, id,
+        nodeVersion: layer == 'node' ? _nodeKey : null));
+    _savePrefs();
+  }
+
+  /// 只在用户真选过底座源时落盘：_sourceId 在那之前只是内部取 index 的
+  /// 源，写进去会伪装成「用户选的」混进下次恢复链。
+  void _savePrefs() {
+    final choice = _choice;
+    final sourceId = _sourceId;
+    if (choice == null || sourceId == null || !_basePicked) return;
+    unawaited(LocalRuntimeController.saveVariantPrefs(
+      sourceId: sourceId,
+      choice: choice,
+      nodeSourceId: _nodeSourceId,
+      engineSourceId: _engineSourceId,
+    ));
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
@@ -298,23 +384,23 @@ class _DownloadSourceStepPageState extends ConsumerState<DownloadSourceStepPage>
       footer: Row(
         children: [
           OutlinedButton(
-            onPressed: _reprobing ? null : _reprobeAll,
+            onPressed: (_reprobing || _indexLoading) ? null : _reprobeAll,
             // 64 = 按钮类默认最小宽。不能用 Size.fromHeight(52)：
             // fromHeight 的宽是 infinity，在 Row（不约束宽）里就是
             // infinite width 布局错误，release 下断言剥掉后整个按钮静默消失。
             style: OutlinedButton.styleFrom(minimumSize: const Size(64, 52)),
             child: _reprobing
                 ? const SizedBox(
-                    width: 20, height: 20,
+                    width: 20,
+                    height: 20,
                     child: CircularProgressIndicator(strokeWidth: 2))
                 : Text(l10n.setupSourceReprobe),
           ),
           const SizedBox(width: 12),
           Expanded(
             child: FilledButton(
-              onPressed: _sourceId == null || _choice == null
-                  ? null
-                  : () async {
+              onPressed: _allReady
+                  ? () async {
                       await LocalRuntimeController.saveVariantPrefs(
                         sourceId: _sourceId!,
                         choice: _choice!,
@@ -322,7 +408,8 @@ class _DownloadSourceStepPageState extends ConsumerState<DownloadSourceStepPage>
                         engineSourceId: _engineSourceId,
                       );
                       widget.onDone(_sourceId!, _choice!);
-                    },
+                    }
+                  : null,
               style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
               child: Text(l10n.setupSourceStart),
             ),
@@ -338,108 +425,67 @@ class _DownloadSourceStepPageState extends ConsumerState<DownloadSourceStepPage>
         ),
         // 构建标记：真机对版用（排"装的不是新包"的雷）。
         Text(
-          'build v3r25',
+          'build v3r28',
           style: Theme.of(context).textTheme.labelSmall?.copyWith(
               color: Theme.of(context).colorScheme.onSurfaceVariant),
         ),
         const SizedBox(height: 28),
-        // 索引未到位也先亮三卡：源 chips 可选可换源重试，版本行显示占位。
-        if (_indexLoading || _indexError != null || _index == null) ...[
-          if (_indexError != null)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Text(_indexError!, style: Theme.of(context).textTheme.bodySmall),
-            ),
-          _LayerCard(
-            key: const ValueKey('setup-layer-base-skeleton'),
-            label: l10n.setupSourceRootfs,
-            variants: const [],
-            selectedKey: '',
-            onVariant: (_) {},
-            sources: _basePool(),
-            selectedSourceId: _sourceId,
-            onSource: (id) => unawaited(_selectSource(id, _choice)),
-            probes: _layerProbes,
-            layer: 'base',
-            loading: _indexError != null ? l10n.setupSourceIndexFailed : '…',
+        if (_indexError != null)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Text(_indexError!, style: Theme.of(context).textTheme.bodySmall),
           ),
-          const SizedBox(height: 12),
-          _LayerCard(
-            key: const ValueKey('setup-layer-node-skeleton'),
-            label: l10n.setupSourceNode,
-            variants: const [],
-            selectedKey: '',
-            onVariant: (_) {},
-            sources: _layerSources['node'] ?? const [],
-            selectedSourceId: _nodeSourceId ?? _sourceId,
-            onSource: (id) => _pickLayerSource('node', id),
-            probes: _layerProbes,
-            layer: 'node',
-            loading: '…',
-          ),
-          const SizedBox(height: 12),
-          _LayerCard(
-            key: const ValueKey('setup-layer-engine-skeleton'),
-            label: l10n.setupSourceDsh,
-            variants: const [],
-            selectedKey: '',
-            onVariant: (_) {},
-            sources: _layerSources['engine'] ?? const [],
-            selectedSourceId: _engineSourceId ?? _sourceId,
-            onSource: (id) => _pickLayerSource('engine', id),
-            probes: _layerProbes,
-            layer: 'engine',
-            loading: '…',
-          ),
-          const SizedBox(height: 12),
-        ]
-        else if (_index != null && _choice != null) ...[
-          // v1.5 三层卡片：每层 = 版本下拉 + 该层专属源 chips（各配各的镜像）。
-          _LayerCard(
-            key: const ValueKey('setup-layer-base'),
-            label: l10n.setupSourceRootfs,
-            variants: _index!.base,
-            selectedKey: _choice!.base,
-            onVariant: (k) => _pick(LayersChoice(base: k, node: _choice!.node, engine: _choice!.engine)),
-            sources: _basePool(),
-            selectedSourceId: _sourceId,
-            onSource: (id) => unawaited(_selectSource(id, _choice)),
-            probes: _layerProbes,
-            layer: 'base',
-          ),
-          const SizedBox(height: 12),
-          _LayerCard(
-            key: const ValueKey('setup-layer-node'),
-            label: l10n.setupSourceNode,
-            variants: _index!.node,
-            selectedKey: _choice!.node,
-            onVariant: (k) => _pick(LayersChoice(base: _choice!.base, node: k, engine: _choice!.engine)),
-            sources: _layerSources['node'] ?? const [],
-            selectedSourceId: _nodeSourceId ?? _sourceId,
-            onSource: (id) => _pickLayerSource('node', id),
-            probes: _layerProbes,
-            layer: 'node',
-          ),
-          const SizedBox(height: 12),
-          _LayerCard(
-            key: const ValueKey('setup-layer-engine'),
-            label: l10n.setupSourceDsh,
-            variants: _index!.engine,
-            selectedKey: _choice!.engine,
-            onVariant: (k) => _pickEngine(k),
-            sources: _layerSources['engine'] ?? const [],
-            selectedSourceId: _engineSourceId ?? _sourceId,
-            onSource: (id) => _pickLayerSource('engine', id),
-            probes: _layerProbes,
-            layer: 'engine',
-          ),
-          const SizedBox(height: 12),
+        _LayerCard(
+          key: const ValueKey('setup-layer-base'),
+          label: l10n.setupSourceRootfs,
+          variants: _index?.base ?? const [],
+          selectedKey: _baseKey ?? '',
+          onVariant: (k) => _pickVariant('base', k),
+          // 版本选了才渲染源；index 拉挂时也亮底座源——留换源重试的口子。
+          sources: (_baseKey != null || _indexError != null)
+              ? _basePool()
+              : const [],
+          selectedSourceId: (_basePicked || _indexError != null) ? _sourceId : null,
+          onSource: (_indexError != null && _baseKey == null)
+              ? (id) => unawaited(_selectSource(id, _savedChoice))
+              : _pickBaseSource,
+          probes: _layerProbes,
+          layer: 'base',
+        ),
+        const SizedBox(height: 12),
+        _LayerCard(
+          key: const ValueKey('setup-layer-node'),
+          label: l10n.setupSourceNode,
+          variants: _index?.node ?? const [],
+          selectedKey: _nodeKey ?? '',
+          onVariant: (k) => _pickVariant('node', k),
+          sources: _nodeKey != null ? (_layerSources['node'] ?? const []) : const [],
+          selectedSourceId: _nodeKey != null ? _nodeSourceId : null,
+          onSource: (id) => _pickLayerSource('node', id),
+          probes: _layerProbes,
+          layer: 'node',
+        ),
+        const SizedBox(height: 12),
+        _LayerCard(
+          key: const ValueKey('setup-layer-engine'),
+          label: l10n.setupSourceDsh,
+          variants: _index?.engine ?? const [],
+          selectedKey: _engineKey ?? '',
+          onVariant: (k) => _pickVariant('engine', k),
+          sources: _engineKey != null ? (_layerSources['engine'] ?? const []) : const [],
+          selectedSourceId: _engineKey != null ? _engineSourceId : null,
+          onSource: (id) => _pickLayerSource('engine', id),
+          probes: _layerProbes,
+          layer: 'engine',
+        ),
+        const SizedBox(height: 12),
+        // 三层版本 + 三层源全选齐才亮。
+        if (_allReady)
           Text(
             l10n.setupSourceTotalBytes(((_totalBytes + 1048575) ~/ 1048576)),
             style: Theme.of(context).textTheme.bodySmall,
             textAlign: TextAlign.center,
           ),
-        ],
         const SizedBox(height: 16),
       ],
     );
@@ -448,6 +494,7 @@ class _DownloadSourceStepPageState extends ConsumerState<DownloadSourceStepPage>
 
 
 /// 一层 = 版本下拉 + 该层专属源 chips（每 chip 显示按层探测的延迟/可用性）。
+/// 标题恒显；版本未选/未到位时版本位占「…」，源区不渲染。
 class _LayerCard extends StatelessWidget {
   const _LayerCard({
     super.key,
@@ -460,7 +507,6 @@ class _LayerCard extends StatelessWidget {
     required this.onSource,
     required this.probes,
     required this.layer,
-    this.loading = '',
   });
   final String label;
   final List<LayerVariant> variants;
@@ -471,7 +517,6 @@ class _LayerCard extends StatelessWidget {
   final ValueChanged<String> onSource;
   final Map<String, _ProbeState> probes;
   final String layer;
-  final String loading;
 
   @override
   Widget build(BuildContext context) {
@@ -479,17 +524,12 @@ class _LayerCard extends StatelessWidget {
     return SettingsSection(
       margin: EdgeInsets.zero,
       children: [
-        variants.isEmpty
-            ? Padding(
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                child: Text(loading, style: theme.textTheme.bodySmall),
-              )
-            : _VariantRow(
-                label: label,
-                variants: variants,
-                selectedKey: selectedKey,
-                onChanged: onVariant,
-              ),
+        _VariantRow(
+          label: label,
+          variants: variants,
+          selectedKey: selectedKey,
+          onChanged: onVariant,
+        ),
         if (sources.isNotEmpty)
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
@@ -573,14 +613,18 @@ class _VariantRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final selected = variants.firstWhere((v) => v.key == selectedKey, orElse: () => variants.first);
+    LayerVariant? selected;
+    for (final v in variants) {
+      if (v.key == selectedKey) selected = v;
+    }
     return ListTile(
       dense: true,
       title: Text(label),
-      subtitle: variants.length > 1 ? null : Text(selected.key, style: Theme.of(context).textTheme.bodySmall),
-      trailing: variants.length > 1
-          ? PopupMenuButton<String>(
-              initialValue: selectedKey,
+      // 版本未到位（index 拉取中/失败）：占「…」，标题照常显示。
+      trailing: variants.isEmpty
+          ? Text('…', style: Theme.of(context).textTheme.bodyMedium)
+          : PopupMenuButton<String>(
+              initialValue: selected?.key,
               onSelected: onChanged,
               itemBuilder: (context) => [
                 for (final v in variants)
@@ -592,12 +636,12 @@ class _VariantRow extends StatelessWidget {
                   ),
               ],
               child: Row(mainAxisSize: MainAxisSize.min, children: [
-                Text(selected.key),
+                // 未选版本占「…」：下拉常可点，纯自选不预填。
+                Text(selected?.key ?? '…'),
                 const SizedBox(width: 4),
                 const Icon(AppIcons.expand, size: 18),
               ]),
-            )
-          : null,
+            ),
     );
   }
 }
