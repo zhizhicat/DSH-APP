@@ -120,14 +120,16 @@ for (const mode of ['followup', 'steer']) test(`overlapping ${mode} image retrie
   assert.deepEqual(results, { first: { value: { accepted: true } }, second: { accepted: true } });
   assert.equal(f.inbox.nextTurn.length + f.inbox.nextStep.length, 1);
   assert.equal(f.counts.bindings, 1);
-  assert.equal(f.counts.admissions, 2, 'late commit check does not promise storage deduplication');
+  // pi-ai-era controllers dedupe the retry before attachment admission (upstream
+  // hasPromptRequest early check), so only the first submit reaches admission.
+  assert.equal(f.counts.admissions, 1, 'upstream early check dedupes the retry before admission');
   const inserted = f.session.snapshotEvents().filter(event => event.type === 'agent/inbox/spliced').flatMap(event => event.data.inserted);
   assert.equal(inserted.length, 1);
   const messages = await f.commitPending();
   assert.equal(messages.length, 1);
   assert.equal(messages[0].data.source.rpcId, 'same-id');
   assert.deepEqual(await f.submit('same-id', mode), { accepted: true });
-  assert.equal(f.counts.admissions, 2, 'durable message still satisfies the existing early dedup check');
+  assert.equal(f.counts.admissions, 1, 'durable message still satisfies the existing early dedup check');
 });
 test('different request IDs remain distinct after overlapping admission', async t => {
   const f = await fixture(t);

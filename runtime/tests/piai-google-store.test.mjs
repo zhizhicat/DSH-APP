@@ -47,15 +47,17 @@ async function body(baseUrl, compat) {
   assert.equal(captures[0].method, 'POST');
   return captures[0].body;
 }
-const golden = {
+// pi-ai >= 1.6.0 maps instruction messages to the developer role only on
+// OpenAI's own endpoints; every other host (Google included) keeps system.
+const goldenFor = url => ({
   model: 'request-capture-only',
   messages: [
-    { role: 'developer', content: 'Keep the existing instruction role.' },
+    { role: (url ?? '').includes('api.openai.com') ? 'developer' : 'system', content: 'Keep the existing instruction role.' },
     { role: 'user', content: 'Capture only.' },
   ],
   stream: true, stream_options: { include_usage: true },
   max_completion_tokens: 16, reasoning_effort: 'medium',
-};
+});
 const google = 'https://generativelanguage.googleapis.com/v1beta/openai/';
 for (const [name, url, compat, store] of [
   ['Google official endpoint', google, undefined, false],
@@ -75,6 +77,6 @@ for (const [name, url, compat, store] of [
   ['explicit OpenAI supportsStore false', 'https://api.openai.com/v1', { supportsStore: false }, false],
 ]) {
   test(`store compatibility: ${name}`, options, async () => {
-    assert.deepEqual(await body(url, compat), store ? { ...golden, store: false } : golden);
+    assert.deepEqual(await body(url, compat), store ? { ...goldenFor(url), store: false } : goldenFor(url));
   });
 }
