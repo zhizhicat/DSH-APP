@@ -1453,11 +1453,18 @@ def cmd_assemble(args):
                 hardlinks.append((p, norm_member(m.linkname), m.mode))
             else:
                 drop("device-or-fifo", p, 0)
-    for p, target, mode in hardlinks:  # hard links become independent copies
+    for p, target, mode in hardlinks:  # hard links become symlinks to the target
+        # 2026-11-22: 上游 ubuntu-26.04 把 coreutils 换成 Rust multicall（一个
+        # 10.5MB 实体 + 114 个硬链接）。独立副本会让 base 层膨胀 1.16GB
+        # （解压态 1416MB vs 同族 246MB，v3r29 实测）；tar 硬链接在 App 端
+        # TarExtractor 也是展开成复制（装到手机同样多占 1.16GB）。符号链接
+        # 两头都省：multicall 按调用的 argv[0] 分发，与上游 usr/bin/cat →
+        # ../lib/cargo/bin/coreutils/cat 的既有符号链接链语义一致。
         src = entries.get(target)
         if src is None or src.kind != "file":
             raise SystemExit("hard link %s -> %s has no regular-file target" % (p, target))
-        entries[p] = Entry("file", mode, data=src.data, origin="ubuntu")
+        entries[p] = Entry("symlink", 0o777,
+                           link=posixpath.relpath(target, posixpath.dirname(p) or "."), origin="ubuntu")
         report["convertedHardlinks"].append("%s -> %s" % (p, target))
 
     # 1b. extra Architecture: all packages (e.g. tzdata), registered in the dpkg database
@@ -1482,11 +1489,13 @@ def cmd_assemble(args):
                     entries[p] = Entry("file", m.mode, data=t.extractfile(m).read(), origin="deb")
                 elif m.issym():
                     entries[p] = Entry("symlink", 0o777, link=m.linkname, origin="deb")
-                elif m.islnk():  # hard link -> independent copy (target precedes it in the tar)
+                elif m.islnk():  # hard link -> relative symlink (同 base 段 2026-11-22 修法)
                     src = entries.get(norm_member(m.linkname))
                     if src is None or src.kind != "file":
                         raise SystemExit("hard link %s -> %s without target in %s" % (m.name, m.linkname, deb))
-                    entries[p] = Entry("file", m.mode, data=src.data, origin="deb")
+                    entries[p] = Entry("symlink", 0o777,
+                                       link=posixpath.relpath(norm_member(m.linkname), posixpath.dirname(p) or "."),
+                                       origin="deb")
                     report["convertedHardlinks"].append("%s -> %s" % (p, norm_member(m.linkname)))
                 else:
                     raise SystemExit("unsupported member %s in %s" % (m.name, deb))
@@ -1921,7 +1930,8 @@ def cmd_manifest(args):
         "uncompressedBytes": report["uncompressedBytes"],
         "entries": report["counts"],
         "archiveNotes": "GNU tar; names relative (no ./); only dirs, regular files and symlinks; "
-                        "hard links already converted to copies; every symlink is relative and stays "
+                        "hard links converted to relative symlinks (2026-11-22, ubuntu-26.04 coreutils "
+                        "multicall); every symlink is relative and stays "
                         "inside the rootfs; no member lies under a symlink; setuid/setgid cleared; "
                         "uid/gid 0; sorted parent-before-child",
         "dshVersion": v["dshVersion"],

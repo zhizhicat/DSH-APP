@@ -425,7 +425,7 @@ class _DownloadSourceStepPageState extends ConsumerState<DownloadSourceStepPage>
         ),
         // 构建标记：真机对版用（排"装的不是新包"的雷）。
         Text(
-          'build v3r29',
+          'build v3r30',
           style: Theme.of(context).textTheme.labelSmall?.copyWith(
               color: Theme.of(context).colorScheme.onSurfaceVariant),
         ),
@@ -533,30 +533,48 @@ class _LayerCard extends StatelessWidget {
         if (sources.isNotEmpty)
           // 源列表网格：一行两个、等宽卡片、中间留 8dp 空隙（替代原 Wrap
           // 流式布局——自适应宽导致右缘参差、窄 chip 挤成一团）。
+          // 注意不能用 LayoutBuilder 量宽：OnboardingScaffold 的滚动区外层
+          // 是 IntrinsicHeight，LayoutBuilder 不支持 intrinsic 高度测量
+          // （release 静默返回 0），源列表高度会被算漏 → 页面溢出且无法
+          // 滚动（v3r29 实锤）。Row 分对 + 两个 Expanded 同样等宽，且
+          // intrinsic 友好；奇数个时末位补空 SizedBox 保持左右等宽。
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-            child: LayoutBuilder(builder: (context, constraints) {
-              final gap = 8.0;
-              final itemWidth = (constraints.maxWidth - gap) / 2;
-              return Wrap(
-                spacing: gap,
-                runSpacing: gap,
-                children: [
-                  for (final src in sources)
-                    SizedBox(
-                      width: itemWidth,
-                      child: _SourceChip(
-                        source: src,
-                        layer: layer,
-                        probe: probes['$layer:${src.id}'] ?? const _ProbeState(),
-                        selected: selectedSourceId == src.id,
-                        onTap: () => onSource(src.id),
-                        theme: theme,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                for (var i = 0; i < sources.length; i += 2)
+                  Padding(
+                    padding: EdgeInsets.only(bottom: i + 2 < sources.length ? 8 : 0),
+                    child: Row(children: [
+                      Expanded(
+                        child: _SourceChip(
+                          source: sources[i],
+                          layer: layer,
+                          probe: probes['$layer:${sources[i].id}'] ?? const _ProbeState(),
+                          selected: selectedSourceId == sources[i].id,
+                          onTap: () => onSource(sources[i].id),
+                          theme: theme,
+                        ),
                       ),
-                    ),
-                ],
-              );
-            }),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        // 奇数收尾：占位保持行内两列等宽。
+                        child: i + 1 < sources.length
+                            ? _SourceChip(
+                                source: sources[i + 1],
+                                layer: layer,
+                                probe: probes['$layer:${sources[i + 1].id}'] ?? const _ProbeState(),
+                                selected: selectedSourceId == sources[i + 1].id,
+                                onTap: () => onSource(sources[i + 1].id),
+                                theme: theme,
+                              )
+                            : const SizedBox(),
+                      ),
+                    ]),
+                  ),
+              ],
+            ),
           ),
       ],
     );
