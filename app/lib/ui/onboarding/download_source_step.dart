@@ -531,23 +531,32 @@ class _LayerCard extends StatelessWidget {
           onChanged: onVariant,
         ),
         if (sources.isNotEmpty)
+          // 源列表网格：一行两个、等宽卡片、中间留 8dp 空隙（替代原 Wrap
+          // 流式布局——自适应宽导致右缘参差、窄 chip 挤成一团）。
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-            child: Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                for (final src in sources)
-                  _SourceChip(
-                    source: src,
-                    layer: layer,
-                    probe: probes['$layer:${src.id}'] ?? const _ProbeState(),
-                    selected: selectedSourceId == src.id,
-                    onTap: () => onSource(src.id),
-                    theme: theme,
-                  ),
-              ],
-            ),
+            child: LayoutBuilder(builder: (context, constraints) {
+              final gap = 8.0;
+              final itemWidth = (constraints.maxWidth - gap) / 2;
+              return Wrap(
+                spacing: gap,
+                runSpacing: gap,
+                children: [
+                  for (final src in sources)
+                    SizedBox(
+                      width: itemWidth,
+                      child: _SourceChip(
+                        source: src,
+                        layer: layer,
+                        probe: probes['$layer:${src.id}'] ?? const _ProbeState(),
+                        selected: selectedSourceId == src.id,
+                        onTap: () => onSource(src.id),
+                        theme: theme,
+                      ),
+                    ),
+                ],
+              );
+            }),
           ),
       ],
     );
@@ -594,8 +603,17 @@ class _SourceChip extends StatelessWidget {
           ),
           color: selected ? theme.colorScheme.primary.withValues(alpha: 0.08) : null,
         ),
-        child: Row(mainAxisSize: MainAxisSize.min, children: [
-          Text(source.name, style: theme.textTheme.labelMedium),
+        child: Row(children: [
+          // 网格等宽卡片：源名超长截断省略，与尾缀（ms/红叉/转圈）之间
+          // 弹性留白，短名不拉伸文字。
+          Expanded(
+            child: Text(
+              source.name,
+              style: theme.textTheme.labelMedium,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
           const SizedBox(width: 6),
           tail,
         ]),
