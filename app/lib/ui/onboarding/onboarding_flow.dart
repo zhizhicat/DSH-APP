@@ -34,6 +34,7 @@ class OnboardingFlow extends StatefulWidget {
     required this.onRuntimeDone,
     required this.onKeyDone,
     this.chooseRuntime = false,
+    this.variantSource = false,
     this.onRemote,
     this.onLocal,
     this.onSourceDone,
@@ -52,6 +53,11 @@ class OnboardingFlow extends StatefulWidget {
   /// The runtime step asks first: this phone or a remote host
   /// ([RuntimeSetupPage.choose]); false installs (resume, upgrade, reset).
   final bool chooseRuntime;
+
+  /// A variant (schema 3) channel serves this build: picking 本机 goes
+  /// through the source+version page, so the step bar counts it as one of
+  /// the flow's steps (2026-11-22: 对齐宿主引导, no longer a standalone page).
+  final bool variantSource;
 
   /// Picked 「远程主机」 (or gave up on a failed install for one).
   final VoidCallback? onRemote;
@@ -118,15 +124,25 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
     };
     // The step bar counts the questions: where DSH runs, then (on this
     // phone, first run) the look and what DSH Go should do, then the
-    // connection.
-    final steps = widget.chooseRuntime || widget.beside
-        ? const [
-            OnboardingStep.runtime,
-            OnboardingStep.appearance,
-            OnboardingStep.access,
-            OnboardingStep.apiKey,
-          ]
-        : const [OnboardingStep.runtime, OnboardingStep.apiKey];
+    // connection. A variant build's source+version page sits between the
+    // 本机 pick and the look: counted too, so it reads as one of the flow's
+    // steps instead of a standalone page.
+    final steps = !(widget.chooseRuntime || widget.beside)
+        ? const [OnboardingStep.runtime, OnboardingStep.apiKey]
+        : widget.variantSource
+            ? const [
+                OnboardingStep.runtime,
+                OnboardingStep.downloadSource,
+                OnboardingStep.appearance,
+                OnboardingStep.access,
+                OnboardingStep.apiKey,
+              ]
+            : const [
+                OnboardingStep.runtime,
+                OnboardingStep.appearance,
+                OnboardingStep.access,
+                OnboardingStep.apiKey,
+              ];
     final index = steps.indexOf(step);
     return OnboardingSwitcher(
       child: KeyedSubtree(

@@ -387,6 +387,7 @@ class _RootGateState extends ConsumerState<RootGate> {
         child = OnboardingFlow(
           step: step,
           chooseRuntime: _chooseRuntime,
+          variantSource: _variantAvailable == true,
           beside: _beside,
           onLocal: _chooseRuntime ? _chooseLocal : null,
           onSourceDone: _afterSource,
