@@ -1,0 +1,56 @@
+--- a/node_modules/@deepseek-ai/dsh-plugin-manager/lib/index.js
++++ b/node_modules/@deepseek-ai/dsh-plugin-manager/lib/index.js
+@@ -2902,6 +2902,8 @@
+ 			const control = {
+ 				abort: new AbortController(),
+ 				phase: "installing",
++				runs: [],
++				restoreFailure: void 0,
+ 				result: Promise.resolve(null)
+ 			};
+ 			const stopped = () => control.abort.signal.aborted || this.abort.signal.aborted;
+@@ -2977,7 +2979,10 @@
+ 					let run;
+ 					let used = null;
+ 					for (const [index, registry] of plan.entries()) {
+-						if (index > 0) await this.restoreFiles(files);
++						if (index > 0) {
++							await stopOwnedRuns(control.runs);
++							await this.restoreFiles(files);
++						}
+ 						if (stopped()) throw new InstallCancelledError();
+ 						result.registries.push(registry);
+ 						used = registry;
+@@ -3035,11 +3040,21 @@
+ 					version = manifest.version;
+ 					this.installedFrom.set(name, used);
+ 				} catch (error) {
+-					await this.restoreFiles(files);
++					// Private stop and restore facts survive unrelated finalizer failures and result folding.
++					await stopOwnedRuns(control.runs);
++					try {
++						await this.restoreFiles(files);
++					} catch (restoreError) {
++						control.restoreFailure = restoreError;
++						throw restoreError;
++					} finally {
++						for (const run of control.runs) await run.release();
++					}
+ 					throw error;
+ 				}
+ 				control.phase = "applying";
+ 				announce("applying");
++				for (const run of control.runs) await run.release();
+ 				result.bundle = name;
+ 				if (version !== void 0) result.version = version;
+ 				result.target = name;
+@@ -3084,6 +3099,9 @@
+ 			control.abort.abort();
+ 			/* v8 ignore next -- change() folds every failure into its result; only a lock or disposal error rejects */
+ 			await control.result.then(() => void 0, () => void 0);
++			const stopFailure = ownedStopFailure(control.runs);
++			if (stopFailure !== void 0) throw stopFailure;
++			if (control.restoreFailure !== void 0) throw control.restoreFailure;
+ 			return { status: "cancelled" };
+ 		}
+ 		/** Unload and remove a profile-owned bundle dependency through dsh plugin's pnpm path; a selected name no

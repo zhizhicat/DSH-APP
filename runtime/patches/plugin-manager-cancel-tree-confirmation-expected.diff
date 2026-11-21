@@ -1,0 +1,39 @@
+--- a/node_modules/@deepseek-ai/dsh-plugin-manager/lib/index.js
++++ b/node_modules/@deepseek-ai/dsh-plugin-manager/lib/index.js
+@@ -891,7 +891,10 @@
+ 				}
+ 				if (expected !== void 0 && !seen) fail("unexpected-package", `${expected.name}@${expected.version} is not installed`);
+ 				if (warnings.length > 0) {
++					// Compatibility recovery writes the same files as outer rollback.
++					await stopOwnedRuns(ownedRuns);
+ 					await restore();
++					if (combinedSignal.aborted) throw new InstallCancelledError();
+ 					const repair = ["install", savedFiles.some((file) => file.path.endsWith("pnpm-lock.yaml") && file.text !== void 0) ? "--frozen-lockfile" : "--config.lockfile=false"];
+ 					const repairing = execa(options.command ?? "pnpm", [...options.args ?? [], ...repair], {
+ 						cwd: dir,
+@@ -2988,7 +2991,7 @@
+ 							installSpec,
+ 							...options?.saveExact === true ? ["--save-exact"] : [],
+ 							...registryArguments(registry)
+-						], control.abort.signal, requestId, options?.expected);
++						], control.abort.signal, requestId, control.runs, options?.expected);
+ 						result.packageResult = run;
+ 						if (stopped()) throw new InstallCancelledError();
+ 						if (run.incompatible !== void 0) throw new ManagementFailure("incompatible-version", run.incompatible);
+@@ -3155,7 +3158,7 @@
+ 			};
+ 		}
+ 		/** Run one pnpm command in the profile, streaming its output as install-log chunks; `expected` is the package an `add` must install. */
+-		async runPnpm(args, signal, requestId, expected) {
++		async runPnpm(args, signal, requestId, ownedRuns, expected) {
+ 			const jobId = randomUUID();
+ 			// Log arguments are separate from execution arguments. Restrict userinfo
+ 			// matching to URL authority; support aliases and --registry=URL too.
+@@ -3173,6 +3176,7 @@
+ 				activateNewBundles: false,
+ 				idleTimeoutMs: this.idleTimeoutMs,
+ 				lookupTimeoutMs: this.inspectTimeoutMs,
++				...ownedRuns === void 0 ? {} : { onRunGuard: (guard) => ownedRuns.push(guard) },
+ 				...expected === void 0 ? {} : { expected },
+ 				onOutput: (text, stream) => {
+ 					this.ownerContext.emit("plugin-manager/install-log", {

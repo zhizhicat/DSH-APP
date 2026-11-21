@@ -6,9 +6,12 @@ install-log-redaction.diff
 install-log-redaction-expected.diff
 piai-anthropic-opus55-thinking.diff
 piai-google-openai-store.diff
+piai-google-openai-store-expected.diff
 plugin-manager-active-run-guard.diff
 plugin-manager-cancel-tree-confirmation.diff
+plugin-manager-cancel-tree-confirmation-expected.diff
 plugin-manager-cancel-tree-expected.diff
+plugin-manager-cancel-tree-expected-expected.diff
 preset-legacy-delegation.diff
 route-guard.diff
 route-guard-expected.diff
@@ -148,6 +151,7 @@ rrule-mixed-byday.diff
 input-trigger-source-recovery.diff
 web-preset-save-freshness.diff
 web-search-key-write-result.diff
+web-search-key-write-result-expected.diff
 deepseek-attachment-error.diff
 fork-default-effort.diff
 config-editor-lock-order.diff
