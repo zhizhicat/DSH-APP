@@ -652,10 +652,18 @@ class RuntimeBridge {
   }
 
   /// One-byte range probe through a mirror against the channel's index URL.
-  Future<Map<Object?, Object?>> probeChannelSource(String channelId, String sourceId) async {
+  /// [raceId] registers the connection natively so [cancelProbes] can
+  /// disconnect the losers once a winner lands.
+  Future<Map<Object?, Object?>> probeChannelSource(String channelId, String sourceId, {String? raceId}) async {
     final raw = await _methods.invokeMethod<Object?>(
-        'probeChannelSource', {'channelId': channelId, 'sourceId': sourceId});
+        'probeChannelSource', {'channelId': channelId, 'sourceId': sourceId, 'raceId': ?raceId});
     return (raw! as Map).cast<Object?, Object?>();
+  }
+
+  /// Disconnect every in-flight probe registered under [raceId] (finished
+  /// connections are unaffected). Losers stop mid-flight, not ignored.
+  Future<void> cancelProbes(String raceId) async {
+    await _methods.invokeMethod<void>('cancelProbes', {'raceId': raceId});
   }
 
   // ---- v1.5 三层分源 ----

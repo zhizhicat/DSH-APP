@@ -169,6 +169,30 @@ class LocalRuntimeController extends Notifier<LocalRuntimeState> {
   Future<Map<Object?, Object?>> probeSource(String channelId, String sourceId) =>
       _bridge.probeChannelSource(channelId, sourceId);
 
+  /// 四源齐发竞速（2026-11-22 拍板）：全部源并发探测，第一个探通的源胜出，
+  /// 随即 native 侧掐断其余在飞连接（真·disconnect，不是忽略结果）。
+  /// 返回胜者 id；全挂返回 null。
+  Future<String?> raceProbeSource(String channelId, List<RuntimeSourceInfo> sources) async {
+    final raceId = 'race-${DateTime.now().microsecondsSinceEpoch}';
+    final winner = Completer<String?>();
+    final probes = <Future<void>>[];
+    for (final s in sources) {
+      probes.add(() async {
+        try {
+          final r = await _bridge.probeChannelSource(channelId, s.id, raceId: raceId);
+          if (r['ok'] == true && !winner.isCompleted) winner.complete(s.id);
+        } catch (_) {/* 该源探败：等其余 */ }
+      }());
+    }
+    // 全部探测结束后仍无人胜出才放行 null。
+    unawaited(Future.wait(probes).then((_) {
+      if (!winner.isCompleted) winner.complete(null);
+    }));
+    final fastest = await winner.future;
+    await _bridge.cancelProbes(raceId);
+    return fastest;
+  }
+
   /// Fetches and parses the layers index for [channelId] through [sourceId].
   /// Throws the native error message when the fetch fails (the source page
   /// surfaces it; [LayersIndex.parse] null means an unparsable body).

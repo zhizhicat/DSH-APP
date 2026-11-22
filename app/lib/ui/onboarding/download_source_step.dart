@@ -112,11 +112,28 @@ class _DownloadSourceStepPageState extends ConsumerState<DownloadSourceStepPage>
     // 只还原用户上次自己选的（B），不做任何 fallback 预选。
     _nodeSourceId = _validLayerSource('node', saved.nodeSourceId);
     _engineSourceId = _validLayerSource('engine', saved.engineSourceId);
-    final fetchFrom = _savedBaseSourceId ??
-        (_sources.isEmpty ? null : _sources.first.id);
-    if (fetchFrom != null && channelId != null) {
-      unawaited(_selectSource(fetchFrom, _savedChoice));
+    // 初始 index 的源：已保存的用已保存的（用户的选择优先）；首次进入对
+    // gh 四源并发探测竞速——第一个探通的立即用它拉 index（2026-11-22 拍板）。
+    // 输了的源只探不拉，UI 源选择不受影响（_savePrefs 护栏：拉 index 的
+    // 源不落盘、不伪装成用户选择）。
+    if (_savedBaseSourceId != null && channelId != null) {
+      unawaited(_selectSource(_savedBaseSourceId!, _savedChoice));
+      return;
     }
+    if (channelId != null && _sources.isNotEmpty) {
+      unawaited(_raceIndexSource(channelId));
+    }
+  }
+
+  /// 四路齐发探测（2026-11-22 拍板）：第一个探通的源立即用它拉 index，
+  /// 其余在飞探测 native 侧直接掐断（真·disconnect）；全挂则按池序串行
+  /// 兜底（_selectSource 既有故障转移，错误文案与旧行为一致）。
+  Future<void> _raceIndexSource(String channelId) async {
+    final fastest = await ref
+        .read(localRuntimeProvider.notifier)
+        .raceProbeSource(channelId, _sources);
+    if (!mounted) return;
+    await _selectSource(fastest ?? _sources.first.id, _savedChoice);
   }
 
   bool _reprobing = false;

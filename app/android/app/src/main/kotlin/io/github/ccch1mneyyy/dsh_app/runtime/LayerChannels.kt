@@ -12,13 +12,38 @@ import java.net.URL
  * engine layer archives; the person picks one of each, they download in order
  * and unpack over each other (later layers win) via the regular installer.
  */
+/**
+ * Race-cancelling probes (2026-11-22 拍板「四路齐发，胜者即走，其余直接停止」)：
+ * 同一 raceId 的探测共享一组连接，胜者产生后 [cancel] 把其余在飞连接
+ * disconnect 掉——不是 Dart 侧忽略结果，是真·掐断，输家连响应都不等。
+ */
+internal object ProbeRegistry {
+    private val conns = java.util.concurrent.ConcurrentHashMap<String, MutableSet<HttpURLConnection>>()
+
+    fun register(raceId: String, conn: HttpURLConnection) {
+        conns.getOrPut(raceId) {
+            java.util.Collections.newSetFromMap(java.util.concurrent.ConcurrentHashMap())
+        }.add(conn)
+    }
+
+    fun unregister(raceId: String, conn: HttpURLConnection) {
+        conns[raceId]?.remove(conn)
+    }
+
+    fun cancel(raceId: String) {
+        conns.remove(raceId)?.forEach { runCatching { it.disconnect() } }
+    }
+}
+
 internal object LayerChannels {
 
-    /** Probe a mirror by fetching one byte through it. */
-    fun probe(url: String, timeoutMs: Int = 8_000): Map<String, Any?> {
+    /** Probe a mirror by fetching one byte through it.
+     *  [raceId] non-null registers the connection for cancel-losers. */
+    fun probe(url: String, timeoutMs: Int = 8_000, raceId: String? = null): Map<String, Any?> {
         val started = System.currentTimeMillis()
         return try {
             val connection = URL(url).openConnection() as HttpURLConnection
+            if (raceId != null) ProbeRegistry.register(raceId, connection)
             connection.connectTimeout = timeoutMs
             connection.readTimeout = timeoutMs
             connection.instanceFollowRedirects = true
@@ -28,6 +53,7 @@ internal object LayerChannels {
                 val latency = System.currentTimeMillis() - started
                 mapOf("ok" to (code in 200..299), "status" to code, "latencyMs" to latency)
             } finally {
+                if (raceId != null) ProbeRegistry.unregister(raceId, connection)
                 connection.disconnect()
             }
         } catch (e: Exception) {

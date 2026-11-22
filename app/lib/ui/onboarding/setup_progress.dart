@@ -118,9 +118,11 @@ class RuntimeInstallController extends Notifier<bool> {
           final sources = await runtime.channelSources();
           if (sources.isNotEmpty) {
             final prefs = await LocalRuntimeController.loadVariantPrefs();
+            // 没有保存源时四源竞速选初始源（2026-11-22 拍板：探通即用，
+            // 其余探测 native 掐断）；全挂回落池序首源。
             final sourceId = sources.any((s) => s.id == prefs.sourceId)
                 ? prefs.sourceId
-                : sources.first.id;
+                : (await runtime.raceProbeSource(channel.id, sources) ?? sources.first.id);
             final index = await runtime.layersIndex(channel.id, sourceId);
             if (index != null) {
               await installVariant(sourceId, LayersChoice.defaultFor(index));

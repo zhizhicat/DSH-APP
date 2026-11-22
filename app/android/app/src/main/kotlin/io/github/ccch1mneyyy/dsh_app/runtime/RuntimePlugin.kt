@@ -198,8 +198,10 @@ class RuntimePlugin :
             "probeChannelSource" -> {
                 // Probe the real index URL through the chosen mirror so the
                 // person sees the latency of the exact path the install uses.
+                // raceId: 四源竞速时传入；胜者产生后 cancelProbes 掐断其余在飞连接。
                 val channelId = call.argument<String>("channelId")
                 val sourceId = call.argument<String>("sourceId") ?: ""
+                val raceId = call.argument<String>("raceId")
                 if (channelId.isNullOrEmpty()) return result.error("bad_args", "channelId required", null)
                 Thread {
                     try {
@@ -208,11 +210,19 @@ class RuntimePlugin :
                             ?: throw java.io.IOException("unknown layer channel")
                         val source = ChannelRegistry.sources(appContext)
                             .firstOrNull { it.id == sourceId } ?: ChannelRegistry.Source(sourceId, sourceId, "")
-                        result.success(LayerChannels.probe(source.prefix + channel.githubBase + channel.indexPath))
+                        result.success(LayerChannels.probe(
+                            source.prefix + channel.githubBase + channel.indexPath, raceId = raceId))
                     } catch (e: Exception) {
                         result.success(mapOf("ok" to false, "latencyMs" to -1, "status" to -1))
                     }
                 }.start()
+            }
+            "cancelProbes" -> {
+                // 掐断同 raceId 的全部在飞探测连接（已完成的 disconnect 无副作用）。
+                val raceId = call.argument<String>("raceId")
+                if (raceId.isNullOrEmpty()) return result.error("bad_args", "raceId required", null)
+                ProbeRegistry.cancel(raceId)
+                result.success(null)
             }
             "layerChannelIndex" -> {
                 val channelId = call.argument<String>("channelId")
