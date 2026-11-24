@@ -23,6 +23,15 @@ internal interface ArchiveSource {
     fun open(path: String): InputStream
 
     fun openSeekable(path: String): SeekableInputStream
+
+    /**
+     * 2026-11-22 解压完即删:一层 verify+extract 收尾后调用,释放该层压缩包
+     * 占用的下载缓存空间(峰值期 tar 与 staging 并存,base 层可达 100MB+)。
+     * 仅 [FileArchiveSource] 支持——APK assets 里的件本来就不占独立空间,
+     * 静默跳过。重试语义:删除后 resume/cache 路径自然回落到重新下载,
+     * 与删缓存文件的行为一致。
+     */
+    fun delete(path: String) {}
 }
 
 internal class AssetArchiveSource(private val context: Context) : ArchiveSource {
@@ -55,6 +64,11 @@ internal class FileArchiveSource(private val dir: File) : ArchiveSource {
     override fun open(path: String): InputStream = FileInputStream(fileOf(path))
 
     override fun openSeekable(path: String): SeekableInputStream = FileSeekableInputStream(fileOf(path))
+
+    override fun delete(path: String) {
+        // 解压完即删:失败不致命(缓存清理兜底),但记不到日志接口里,保持静默。
+        runCatching { fileOf(path).delete() }
+    }
 }
 
 /** [SeekableInputStream] over a plain file; mirrors [AssetSeekableInputStream]. */

@@ -13,14 +13,15 @@ import java.util.concurrent.Executors
 import java.util.concurrent.Future
 import java.util.concurrent.TimeUnit
 
-/** Single tar consumer; two decoded blocks total, including its current block. */
+/** Single tar consumer; up to [workerCount] decoded blocks in flight, including the current one. */
 internal class ParallelXZInputStream private constructor(
     private val decoders: Array<SeekableXZInputStream>,
     private val sizes: IntArray,
     private val progress: LongArray,
     private val onProgress: (Long) -> Unit,
 ) : InputStream() {
-    private val workers = Array(2) { i ->
+    private val workerCount = decoders.size
+    private val workers = Array(workerCount) { i ->
         Executors.newSingleThreadExecutor { Thread(it, "dsh-xz-$i") }
     }
     private val pending = ArrayDeque<Future<ByteArray>>()
@@ -30,13 +31,13 @@ internal class ParallelXZInputStream private constructor(
     private var offset = 0
     @Volatile private var closed = false
 
-    init { submit(); submit() }
+    init { repeat(workerCount) { submit() } }
 
     private fun submit() {
         if (nextBlock == sizes.size) return
         val block = nextBlock++
-        pending.addLast(workers[block % 2].submit<ByteArray> {
-            val decoder = decoders[block % 2]
+        pending.addLast(workers[block % workerCount].submit<ByteArray> {
+            val decoder = decoders[block % workerCount]
             decoder.seekToBlock(block)
             val bytes = ByteArray(sizes[block])
             var at = 0
@@ -61,7 +62,7 @@ internal class ParallelXZInputStream private constructor(
         if (len == 0) return 0
         try {
             if (current == null) {
-                if (pending.size < 2) submit()
+                if (pending.size < workerCount) submit()
                 if (pending.isEmpty()) return -1
                 current = pending.removeFirst().get()
                 offset = 0
@@ -88,16 +89,31 @@ internal class ParallelXZInputStream private constructor(
         workers.forEach { it.shutdownNow() }
         // A decoder isn't safe to close under a read; a block read stops within 64 KiB.
         workers.forEach { it.awaitTermination(1, TimeUnit.MINUTES) }
-        try { decoders[0].close() } finally { decoders[1].close() }
+        try { decoders[0].close() } finally {
+            decoders.drop(1).forEach { d -> runCatching { d.close() } }
+        }
     }
 
     companion object {
         private const val MAX_BLOCK_BYTES = 24L * 1024 * 1024
         private const val DECODER_MEMORY_KIB = 32 * 1024
 
+        /**
+         * 2026-11-22 扩核:worker 数按 CPU 核与 app 堆双守卫取值。
+         * - CPU:核数-1(给 tar 消费线程/系统留核),上限 4——实测 decode 是
+         *   CPU 密集,4 路以上边际收益递减且加剧闪存并发读放大。
+         * - 内存:每个 worker 预算 96MB(≤32MiB 解码器字典 + ≤24MB 在飞块
+         *   + 常规 GC 余量);堆小(低端机 192MB 档)回落到 2,行为退回原版。
+         */
+        private fun workerBudget(): Int {
+            val byCores = (Runtime.getRuntime().availableProcessors() - 1).coerceIn(2, 4)
+            val byHeap = (Runtime.getRuntime().maxMemory() / (96L * 1024 * 1024)).toInt().coerceAtLeast(2)
+            return minOf(byCores, byHeap)
+        }
+
         fun open(factory: () -> SeekableInputStream, onProgress: (Long) -> Unit = {}): InputStream {
             var first: SeekableXZInputStream? = null
-            var second: SeekableXZInputStream? = null
+            val rest = mutableListOf<SeekableXZInputStream>()
             try {
                 first = decoder(factory)
                 val count = first.blockCount
@@ -112,15 +128,16 @@ internal class ParallelXZInputStream private constructor(
                 // Block filter/dictionary memory is only known when a read initializes
                 // that block. Check every header before tar can write anything.
                 repeat(count) { block -> first.seekToBlock(block); first.read() }
-                second = decoder(factory)
-                return ParallelXZInputStream(arrayOf(first, second), sizes, progress, onProgress)
+                val workers = workerBudget()
+                repeat(workers - 1) { rest.add(decoder(factory)) }
+                return ParallelXZInputStream(arrayOf(first, *rest.toTypedArray()), sizes, progress, onProgress)
             } catch (_: MemoryLimitException) {
                 first?.close()
-                second?.close()
+                rest.forEach { runCatching { it.close() } }
                 return sequential(factory, onProgress)
             } catch (e: Throwable) {
                 try { first?.close() } catch (cleanup: Exception) { e.addSuppressed(cleanup) }
-                try { second?.close() } catch (cleanup: Exception) { e.addSuppressed(cleanup) }
+                rest.forEach { d -> try { d.close() } catch (cleanup: Exception) { e.addSuppressed(cleanup) } }
                 throw e
             }
         }

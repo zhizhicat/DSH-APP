@@ -117,6 +117,10 @@ internal class RuntimeInstaller(
                 // 软链/npmrc 由 engine 层 overlay 提供,此处无需补)。
                 restageOfficialNodeTar(staging, onLog)
             }
+            // 2026-11-22 解压完即删:该层 tar 已 verify+extract 完毕,使命结束。
+            // 峰值期省 100MB+ 下载缓存(FileArchiveSource 生效;assets 源静默跳过)。
+            // 失败重进的代价是该层重新下载,与中断重试语义一致。
+            source.delete(assetPath)
             completed += totals[index]
         }
         onProgress(total, total)
